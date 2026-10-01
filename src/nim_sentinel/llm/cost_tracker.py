@@ -15,7 +15,6 @@ from typing import Any
 
 from nim_sentinel.core import ModelRole
 from nim_sentinel.core.logging import get_logger
-from nim_sentinel.llm.model_registry import get_model_registry
 
 logger = get_logger(__name__)
 
@@ -116,7 +115,7 @@ class CostTracker:
     Thread-safe for concurrent access.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._aggregates: dict[str, AggregatedCosts] = {}
         self._snapshots: list[CostSnapshot] = []
         self._lock = Lock()
@@ -274,7 +273,7 @@ async def track_cost(role: ModelRole | str, model_id: str) -> AsyncGenerator[dic
     start_time = time.perf_counter()
     tracker = get_cost_tracker()
 
-    result = {"tokens_in": 0, "tokens_out": 0, "success": True, "error": None}
+    result: dict[str, Any] = {"tokens_in": 0, "tokens_out": 0, "success": True, "error": None}
 
     try:
         yield result
@@ -297,7 +296,8 @@ async def track_cost(role: ModelRole | str, model_id: str) -> AsyncGenerator[dic
 
 def estimate_cost(role: ModelRole | str, estimated_tokens_in: int, estimated_tokens_out: int) -> float:
     """Estimate cost for a model call."""
-    config = get_model_registry().get_model_config(role)
+    from nim_sentinel.core import get_model_config
+    config = get_model_config(role)
     model_id = config.primary
     tracker = get_cost_tracker()
     return tracker.calculate_cost(model_id, estimated_tokens_in, estimated_tokens_out)

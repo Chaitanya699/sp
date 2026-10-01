@@ -192,6 +192,8 @@ module = [
     "langsmith.*",
     "pydantic",
     "pydantic.*",
+    "pydantic_settings",
+    "pydantic_settings.*",
     "fastapi",
     "fastapi.*",
     "motor",

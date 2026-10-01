@@ -5,13 +5,13 @@ Manages model configurations, fallback chains, circuit breakers, and cost/latenc
 """
 
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from functools import wraps
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
@@ -147,7 +147,13 @@ class ModelFactory:
     """Factory for creating model instances."""
 
     @staticmethod
-    def create_chat_model(model_id: str, temperature: float = 0.1, max_tokens: int = 4096, timeout: int = 30, **kwargs) -> ChatNVIDIA:
+    def create_chat_model(
+        model_id: str,
+        temperature: float = 0.1,
+        max_tokens: int = 4096,
+        timeout: int = 30,
+        **kwargs: Any,
+    ) -> ChatNVIDIA:
         """Create a ChatNVIDIA instance."""
         return ChatNVIDIA(
             model=model_id,
@@ -158,12 +164,12 @@ class ModelFactory:
         )
 
     @staticmethod
-    def create_embedding_model(model_id: str, **kwargs) -> NVIDIAEmbeddings:
+    def create_embedding_model(model_id: str, **kwargs: Any) -> NVIDIAEmbeddings:
         """Create an NVIDIAEmbeddings instance."""
         return NVIDIAEmbeddings(model=model_id, **kwargs)
 
     @staticmethod
-    def create_rerank_model(model_id: str, **kwargs) -> NVIDIARerank:
+    def create_rerank_model(model_id: str, **kwargs: Any) -> NVIDIARerank:
         """Create an NVIDIARerank instance."""
         return NVIDIARerank(model=model_id, **kwargs)
 
@@ -173,7 +179,7 @@ class ModelRegistry:
     Central model registry with fallback chains, circuit breakers, and metrics.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._chat_models: dict[str, ChatNVIDIA] = {}
         self._embedding_models: dict[str, NVIDIAEmbeddings] = {}
         self._rerank_models: dict[str, NVIDIARerank] = {}
@@ -312,7 +318,7 @@ class ModelRegistry:
 
         try:
             if model_type == "chat":
-                model = self.get_chat_model(role_str, use_fallback)
+                model: BaseChatModel | Embeddings | NVIDIARerank = self.get_chat_model(role_str, use_fallback)
             elif model_type == "embedding":
                 model = self.get_embedding_model(role_str, use_fallback)
             elif model_type == "rerank":
@@ -421,7 +427,7 @@ async def tracked_chat_call(
 ) -> AsyncGenerator[ChatNVIDIA, None]:
     """Tracked chat model call."""
     async with get_model_registry().tracked_call(role, "chat", use_fallback) as model:
-        yield model
+        yield model  # type: ignore[misc]
 
 
 @asynccontextmanager
@@ -431,7 +437,7 @@ async def tracked_embedding_call(
 ) -> AsyncGenerator[NVIDIAEmbeddings, None]:
     """Tracked embedding model call."""
     async with get_model_registry().tracked_call(role, "embedding", use_fallback) as model:
-        yield model
+        yield model  # type: ignore[misc]
 
 
 @asynccontextmanager
@@ -441,15 +447,18 @@ async def tracked_rerank_call(
 ) -> AsyncGenerator[NVIDIARerank, None]:
     """Tracked rerank model call."""
     async with get_model_registry().tracked_call(role, "rerank", use_fallback) as model:
-        yield model
+        yield model  # type: ignore[misc]
 
 
 # Decorator for automatic fallback
-def with_fallback(role: ModelRole | str, model_type: str = "chat"):
+F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
+
+
+def with_fallback(role: ModelRole | str, model_type: str = "chat") -> Callable[[F], F]:
     """Decorator to automatically retry with fallback on failure."""
-    def decorator(func):
+    def decorator(func: F) -> F:
         @wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             registry = get_model_registry()
             role_str = role.value if isinstance(role, ModelRole) else role
 
@@ -472,5 +481,5 @@ def with_fallback(role: ModelRole | str, model_type: str = "chat"):
                 else:
                     raise FallbackExhaustedError(role_str, [config.primary]) from None
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
     return decorator
