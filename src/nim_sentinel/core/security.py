@@ -10,13 +10,14 @@ import time
 from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
+from passlib.context import CryptContext
+from pydantic import BaseModel
+
 from nim_sentinel.core.config import get_settings
 from nim_sentinel.core.errors import (
     InvalidTokenError,
     TokenExpiredError,
 )
-from passlib.context import CryptContext
-from pydantic import BaseModel
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -115,7 +116,7 @@ def create_access_token(
     }
 
     encoded_jwt = jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
-    return encoded_jwt
+    return encoded_jwt  # type: ignore[no-any-return]
 
 
 def decode_token(token: str) -> TokenData:
@@ -137,12 +138,12 @@ def decode_token(token: str) -> TokenData:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    return pwd_context.verify(plain_password, hashed_password)  # type: ignore[no-any-return]
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password."""
-    return pwd_context.hash(password)
+    return pwd_context.hash(password)  # type: ignore[no-any-return]
 
 
 def generate_api_key() -> str:

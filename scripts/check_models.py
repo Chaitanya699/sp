@@ -55,7 +55,7 @@ async def fetch_available_models() -> dict[str, list[ModelInfo]]:
         print("ERROR: NVIDIA_API_KEY not set in environment or .env")
         sys.exit(1)
 
-    print(f"Using NVIDIA API key: {api_key[:8]}...{api_key[-4:]}")
+    print("Using NVIDIA API key: loaded" if api_key else "ERROR: NVIDIA API key not loaded")
     print("Fetching available models from NVIDIA...")
 
     results = {"chat": [], "embedding": [], "rerank": [], "vision": [], "other": []}

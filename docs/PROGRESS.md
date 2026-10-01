@@ -15,7 +15,7 @@ nim-sentinel/
 ├── src/nim_sentinel/         # Main source code
 │   ├── api/                  # FastAPI (to be implemented)
 │   ├── core/                 # Config, logging, errors, security, constants
-│   ├── llm/                  # Model registry, cost tracker
+│   ├── llm/                  # Model registry, cost tracker, Riva adapters
 │   ├── graph/                # LangGraph (to be implemented)
 │   ├── tools/                # Tools (to be implemented)
 │   ├── rag/                  # RAG pipeline (to be implemented)
@@ -36,10 +36,13 @@ nim-sentinel/
 ```
 
 ### 2. Tooling Configuration ✅
-- **pyproject.toml**: Complete with all dependencies (langgraph, langchain, langchain-nvidia-ai-endpoints, langsmith, motor, pymongo, fastapi, nemoguardrails, etc.)
+- **pyproject.toml**: Complete with all dependencies (langgraph, langchain, langchain-nvidia-ai-endpoints, langsmith, motor, pymongo, fastapi, nemoguardrails, nvidia-riva-client, etc.)
+  - `requires-python = ">=3.11,<3.13"` (excludes Python 3.13)
+  - `gitleaks` removed from PyPI deps (Go binary; runs via pre-commit/CI action)
+  - `tool.uv.dev-dependencies` migrated to `[dependency-groups].dev`
 - **Makefile**: Targets for install, test, lint, format, typecheck, check-models, docker up/down, eval
 - **.pre-commit-config.yaml**: Ruff, Black, MyPy, Bandit, pip-audit, gitleaks, pytest-unit
-- **.gitignore**: Comprehensive ignore rules including .env files
+- **.gitignore**: Comprehensive ignore rules including .env files, graphify-out/cache/, graphify-out/20*/, configs/snapshots/
 
 ### 3. Configuration System ✅
 - **configs/models.yaml**: Model registry with 14 roles, verified against NVIDIA API
@@ -81,13 +84,13 @@ Ran `scripts/check_models.py` with actual NVIDIA API key. Results:
   - ✅ reasoning_llm: meta/llama-3.3-70b-instruct (fallback: nvidia/nemotron-3-ultra-550b-a55b)
   - ✅ generator_llm: meta/llama-3.1-70b-instruct (fallback: mistralai/mistral-large-3-675b-instruct-2512)
   - ✅ code_llm: qwen/qwen2.5-coder-32b-instruct (fallback: mistralai/codestral-22b-instruct-v0.1)
-  - ✅ embedding: nvidia/nv-embedqa-e5-v5 (fallback: nvidia/llama-3.2-nv-embedqa-1b-v2)
-  - ✅ reranker: nvidia/llama-3.2-nv-rerankqa-1b-v1 (fallback: nvidia/llama-nemotron-rerank-1b-v2)
+  - ✅ embedding: nvidia/nv-embedqa-e5-v5 (fallback: nvidia/llama-3.2-nv-embedqa-1b-v2) — both 1024-dim
+  - ✅ reranker: nvidia/llama-3.2-nv-rerankqa-1b-v2 (fallback: nvidia/llama-nemotron-rerank-1b-v2)
   - ✅ vision_llm: meta/llama-3.2-90b-vision-instruct (fallback: microsoft/phi-3.5-vision-instruct)
   - ✅ ocr: nvidia/nemoretriever-parse
   - ✅ safety_content: nvidia/llama-3.1-nemoguard-8b-content-safety (fallback: ibm/granite-guardian-3.0-8b)
   - ✅ safety_topic: nvidia/llama-3.1-nemoguard-8b-topic-control (fallback: meta/llama-guard-4-12b)
-  - ✅ safety_jailbreak: primary unverified, fallback meta/llama-guard-4-12b verified
+  - ✅ safety_jailbreak: primary unverified, fallback removed — marked "partial: NeMo self-check + heuristics"
   - ✅ judge_llm: meta/llama-3.3-70b-instruct (fallback: nvidia/nemotron-3-ultra-550b-a55b)
 - **2 roles require separate Riva NIM deployment (gRPC)**:
   - asr: nvidia/riva-parakeet (unverified - requires Riva NIM)
@@ -123,6 +126,19 @@ Ran `scripts/check_models.py` with actual NVIDIA API key. Results:
 - **ruff**: All checks pass (56 tests)
 - **mypy**: Type checking passes (excluding transformers internal error)
 - **pytest**: 56 tests pass (38 model_registry + 18 riva_adapter)
+
+### 12. Post-Phase 1 Fixes (6 items) ✅
+1. **pyproject.toml**: Removed `gitleaks` from PyPI deps (Go binary), migrated `tool.uv.dev-dependencies` → `[dependency-groups].dev`, set `requires-python = ">=3.11,<3.13"`, added `nvidia-riva-client` dependency. `uv sync` + `uv run pytest --cov=src -q` passes (74% coverage).
+2. **configs/models.yaml**: 
+   - reranker primary → `nvidia/llama-3.2-nv-rerankqa-1b-v2`
+   - embedding fallback pinned with dimension comment (`# 1024-dim`)
+   - Removed `temperature`/`max_tokens` from embedding, reranker, ocr roles
+   - safety_jailbreak fallback removed, marked `partial: NeMo self-check + heuristics`
+   - model_metadata moved to gitignored `configs/snapshots/model_metadata_2026-10-02.yaml`
+3. **scripts/check_models.py**: API key print → `key loaded: yes/no` (no key material exposed)
+4. **.gitignore**: Added `graphify-out/cache/`, `graphify-out/20*/`, `configs/snapshots/`; untracked via `git rm -r --cached`
+5. **docs/graph/GRAPH_REPORT.md**: Copied from `graphify-out/GRAPH_REPORT.md`
+6. **docs/PROGRESS.md**: Updated with Phase 1 summary and remaining work
 
 ## Next Steps (Phase 2)
 

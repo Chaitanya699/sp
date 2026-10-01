@@ -4,11 +4,11 @@ NIM Sentinel Core Constants
 Application-wide constants and enums.
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Final
 
 
-class ModelRole(str, Enum):
+class ModelRole(StrEnum):
     """Model roles in the registry."""
     SUPERVISOR_LLM = "supervisor_llm"
     REASONING_LLM = "reasoning_llm"
@@ -26,7 +26,7 @@ class ModelRole(str, Enum):
     JUDGE_LLM = "judge_llm"
 
 
-class IntentType(str, Enum):
+class IntentType(StrEnum):
     """User intent classification."""
     KNOWLEDGE_QUESTION = "knowledge_question"
     DATA_ANALYTICS = "data_analytics"
@@ -39,7 +39,7 @@ class IntentType(str, Enum):
     UNKNOWN = "unknown"
 
 
-class GuardrailAction(str, Enum):
+class GuardrailAction(StrEnum):
     """Guardrail action types."""
     BLOCK = "block"
     FLAG = "flag"
@@ -48,14 +48,14 @@ class GuardrailAction(str, Enum):
     REGENERATE = "regenerate"
 
 
-class GuardrailType(str, Enum):
+class GuardrailType(StrEnum):
     """Guardrail types."""
     INPUT = "input"
     OUTPUT = "output"
     TOOL = "tool"
 
 
-class MessageRole(str, Enum):
+class MessageRole(StrEnum):
     """Message roles in conversation."""
     USER = "user"
     ASSISTANT = "assistant"
@@ -63,7 +63,7 @@ class MessageRole(str, Enum):
     TOOL = "tool"
 
 
-class DocumentStatus(str, Enum):
+class DocumentStatus(StrEnum):
     """Document processing status."""
     PENDING = "pending"
     PROCESSING = "processing"
@@ -71,14 +71,14 @@ class DocumentStatus(str, Enum):
     FAILED = "failed"
 
 
-class ThreadStatus(str, Enum):
+class ThreadStatus(StrEnum):
     """Conversation thread status."""
     ACTIVE = "active"
     ARCHIVED = "archived"
     DELETED = "deleted"
 
 
-class ApprovalStatus(str, Enum):
+class ApprovalStatus(StrEnum):
     """Human approval status."""
     PENDING = "pending"
     APPROVED = "approved"
@@ -86,7 +86,7 @@ class ApprovalStatus(str, Enum):
     EXPIRED = "expired"
 
 
-class ToolRiskLevel(str, Enum):
+class ToolRiskLevel(StrEnum):
     """Tool risk levels."""
     LOW = "low"
     MEDIUM = "medium"

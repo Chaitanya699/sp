@@ -14,6 +14,7 @@ from typing import Any
 
 import structlog
 import yaml
+
 from nim_sentinel.core.config import get_settings
 
 # Context variables for correlation tracking
@@ -126,7 +127,7 @@ def setup_logging(config_path: str | None = None) -> None:
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
             add_correlation_id,  # type: ignore[list-item]
-            structlog.processors.JSONRenderer() if settings.log_format == "json" else structlog.dev.ConsoleRenderer(),  # type: ignore[list-item]
+            structlog.processors.JSONRenderer() if settings.log_format == "json" else structlog.dev.ConsoleRenderer(),
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),

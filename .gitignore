@@ -70,6 +70,13 @@ temp/
 # Jupyter
 .ipynb_checkpoints/
 
+# Graphify
+graphify-out/cache/
+graphify-out/20*/
+
+# Config snapshots
+configs/snapshots/
+
 # Secrets (gitleaks will catch these)
 *.pem
 *.key
