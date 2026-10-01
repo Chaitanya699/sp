@@ -1,0 +1,34 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:17909",
+    "ANTHROPIC_AUTH_TOKEN": "sk-dummy-key",
+    "ANTHROPIC_MODEL": "nemotron-3-ultra-550b-a55b",
+    "MAX_THINKING_TOKENS": "0",
+    "DISABLE_COMPUTER_USE": "1",
+    "DISABLE_PROMPT_CACHING": "1"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "graphify hook-guard search",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "graphify hook-guard read",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

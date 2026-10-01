@@ -1,0 +1,125 @@
+# NIM Sentinel Logging Configuration
+# Version: 1.0
+
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  json:
+    format: "%(timestamp)s %(level)s %(name)s %(message)s"
+    class: "pythonjsonlogger.jsonlogger.JsonFormatter"
+    timestamp: true
+    json_ensure_ascii: false
+
+  console:
+    format: "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+  structured:
+    format: "%(asctime)s | %(levelname)-8s | %(name)s | %(funcName)s:%(lineno)d | %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+filters:
+  pii_redaction:
+    (): "nim_sentinel.core.logging.PIIRedactionFilter"
+    patterns:
+      - "api[_-]?key"
+      - "secret[_-]?key"
+      - "access[_-]?token"
+      - "password"
+      - "bearer\\s+[a-zA-Z0-9_-]+"
+      - "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b"
+      - "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+      - "\\b\\d{10}\\b"
+
+handlers:
+  console:
+    class: "logging.StreamHandler"
+    level: "INFO"
+    formatter: "console"
+    stream: "ext://sys.stdout"
+    filters: ["pii_redaction"]
+
+  file:
+    class: "logging.handlers.RotatingFileHandler"
+    level: "DEBUG"
+    formatter: "json"
+    filename: "logs/nim-sentinel.log"
+    maxBytes: 10485760  # 10MB
+    backupCount: 5
+    encoding: "utf-8"
+    filters: ["pii_redaction"]
+
+  error_file:
+    class: "logging.handlers.RotatingFileHandler"
+    level: "ERROR"
+    formatter: "json"
+    filename: "logs/nim-sentinel-error.log"
+    maxBytes: 10485760
+    backupCount: 5
+    encoding: "utf-8"
+    filters: ["pii_redaction"]
+
+  audit:
+    class: "logging.handlers.RotatingFileHandler"
+    level: "INFO"
+    formatter: "json"
+    filename: "logs/audit.log"
+    maxBytes: 10485760
+    backupCount: 10
+    encoding: "utf-8"
+
+loggers:
+  nim_sentinel:
+    level: "DEBUG"
+    handlers: ["console", "file", "error_file"]
+    propagate: false
+
+  nim_sentinel.audit:
+    level: "INFO"
+    handlers: ["audit"]
+    propagate: false
+
+  uvicorn:
+    level: "INFO"
+    handlers: ["console", "file"]
+    propagate: false
+
+  uvicorn.access:
+    level: "INFO"
+    handlers: ["console", "file"]
+    propagate: false
+
+  langchain:
+    level: "WARNING"
+    handlers: ["console", "file"]
+    propagate: false
+
+  langgraph:
+    level: "WARNING"
+    handlers: ["console", "file"]
+    propagate: false
+
+  langsmith:
+    level: "WARNING"
+    handlers: ["console", "file"]
+    propagate: false
+
+  motor:
+    level: "WARNING"
+    handlers: ["console", "file"]
+    propagate: false
+
+  pymongo:
+    level: "WARNING"
+    handlers: ["console", "file"]
+    propagate: false
+
+  httpx:
+    level: "WARNING"
+    handlers: ["console", "file"]
+    propagate: false
+
+root:
+  level: "INFO"
+  handlers: ["console", "file", "error_file"]

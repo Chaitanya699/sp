@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl *)",
+      "Bash(pkill -f \"uvicorn app.main:app\")",
+      "Bash(python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload --no-reload)",
+      "Bash(python -m uvicorn app.main:app --host 0.0.0.0 --port 8001)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :8001)",
+      "Bash(taskkill /F /PID 15416 /PID 8396 /PID 9776 /PID 16216 /PID 8880 /PID 9440 /PID 18476 /PID 10204 /PID 22836 /PID 18776 /PID 14356)",
+      "Bash(npm run *)",
+      "Bash(xxd src/components/TemplateModal.jsx)",
+      "Bash(wmic process *)",
+      "Bash(mkdir *)"
+    ]
+  },
+  "enabledPlugins": {
+    "agent-skills@addy-agent-skills": true
+  }
+}

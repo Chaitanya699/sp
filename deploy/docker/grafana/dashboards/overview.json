@@ -1,0 +1,189 @@
+{
+  "dashboard": {
+    "title": "NIM Sentinel - Overview",
+    "tags": ["nim-sentinel", "overview"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate (req/s)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(nim_sentinel_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "xaxis": {"mode": "time"},
+        "yaxes": [{"format": "reqps"}, {"format": "short"}]
+      },
+      {
+        "id": 2,
+        "title": "Request Latency (p50, p95, p99)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(nim_sentinel_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(nim_sentinel_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(nim_sentinel_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "xaxis": {"mode": "time"},
+        "yaxes": [{"format": "s"}, {"format": "short"}]
+      },
+      {
+        "id": 3,
+        "title": "Model Token Usage (in/out)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(nim_sentinel_model_tokens_in_total[5m])",
+            "legendFormat": "{{role}} - in",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(nim_sentinel_model_tokens_out_total[5m])",
+            "legendFormat": "{{role}} - out",
+            "refId": "B"
+          }
+        ],
+        "xaxis": {"mode": "time"},
+        "yaxes": [{"format": "ops"}, {"format": "short"}]
+      },
+      {
+        "id": 4,
+        "title": "Model Cost (USD/min)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(nim_sentinel_model_cost_usd_total[5m]) * 60",
+            "legendFormat": "{{role}}",
+            "refId": "A"
+          }
+        ],
+        "xaxis": {"mode": "time"},
+        "yaxes": [{"format": "currencyUSD"}, {"format": "short"}]
+      },
+      {
+        "id": 5,
+        "title": "Guardrail Block Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(nim_sentinel_guardrail_blocks_total[5m])",
+            "legendFormat": "{{guardrail}}",
+            "refId": "A"
+          }
+        ],
+        "xaxis": {"mode": "time"},
+        "yaxes": [{"format": "ops"}, {"format": "short"}]
+      },
+      {
+        "id": 6,
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(nim_sentinel_errors_total[5m])",
+            "legendFormat": "{{error_type}}",
+            "refId": "A"
+          }
+        ],
+        "xaxis": {"mode": "time"},
+        "yaxes": [{"format": "ops"}, {"format": "short"}]
+      },
+      {
+        "id": 7,
+        "title": "Active Threads",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 24, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "nim_sentinel_active_threads",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "HITL Pending Approvals",
+        "type": "stat",
+        "gridPos": {"x": 6, "y": 24, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "nim_sentinel_hitl_pending",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Model Fallback Rate",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(nim_sentinel_model_fallbacks_total[5m])",
+            "legendFormat": "{{role}}",
+            "refId": "A"
+          }
+        ],
+        "xaxis": {"mode": "time"},
+        "yaxes": [{"format": "ops"}, {"format": "short"}]
+      },
+      {
+        "id": 10,
+        "title": "Circuit Breaker States",
+        "type": "table",
+        "gridPos": {"x": 0, "y": 32, "w": 24, "h": 8},
+        "targets": [
+          {
+            "expr": "nim_sentinel_circuit_breaker_state",
+            "format": "table",
+            "refId": "A"
+          }
+        ],
+        "columns": [
+          {"text": "Model", "value": "model"},
+          {"text": "Role", "value": "role"},
+          {"text": "State", "value": "state"},
+          {"text": "Failures", "value": "failures"}
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "environment",
+          "type": "query",
+          "query": "label_values(nim_sentinel_requests_total, environment)",
+          "default": "development",
+          "refresh": 1
+        }
+      ]
+    }
+  },
+  "overwrite": true
+}

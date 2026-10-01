@@ -1,0 +1,168 @@
+services:
+  # MongoDB with Vector Search support
+  mongodb:
+    image: mongodb/mongodb-atlas-local:latest
+    container_name: nim-sentinel-mongodb
+    environment:
+      - MONGODB_INITDB_DATABASE=nim_sentinel
+      - MONGODB_INITDB_ROOT_USERNAME=admin
+      - MONGODB_INITDB_ROOT_PASSWORD=changeme
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nim-sentinel-network
+
+  # Redis for caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: nim-sentinel-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nim-sentinel-network
+
+  # API Server
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: development
+    container_name: nim-sentinel-api
+    environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - LANGSMITH_TRACING=true
+      - LANGSMITH_PROJECT=nim-sentinel-dev
+      - MONGODB_URI=mongodb://admin:changeme@mongodb:27017
+      - MONGODB_DATABASE=nim_sentinel
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_RELOAD=true
+      - LOG_LEVEL=DEBUG
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ../../src:/app/src
+      - ../../configs:/app/configs
+      - ../../scripts:/app/scripts
+      - ../../evals:/app/evals
+      - ../../tests:/app/tests
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nim-sentinel-network
+    restart: unless-stopped
+
+  # Background Worker for ingestion
+  worker:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: development
+    container_name: nim-sentinel-worker
+    command: python -m nim_sentinel.worker
+    environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - LANGSMITH_TRACING=true
+      - LANGSMITH_PROJECT=nim-sentinel-dev
+      - MONGODB_URI=mongodb://admin:changeme@mongodb:27017
+      - MONGODB_DATABASE=nim_sentinel
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=INFO
+    volumes:
+      - ../../src:/app/src
+      - ../../configs:/app/configs
+      - ../../scripts:/app/scripts
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nim-sentinel-network
+    restart: unless-stopped
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: nim-sentinel-prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - nim-sentinel-network
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: nim-sentinel-grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - nim-sentinel-network
+
+  # Streamlit UI (optional)
+  ui:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.ui
+    container_name: nim-sentinel-ui
+    ports:
+      - "127.0.0.1:8501:8501"
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      - api
+    networks:
+      - nim-sentinel-network
+    profiles:
+      - ui
+
+volumes:
+  mongodb_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  nim-sentinel-network:
+    driver: bridge

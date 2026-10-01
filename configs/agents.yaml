@@ -1,0 +1,156 @@
+# NIM Sentinel Agent Configuration
+# Version: 1.0
+
+# Supervisor / Router
+supervisor:
+  model_role: "supervisor_llm"
+  temperature: 0.1
+  max_tokens: 1024
+  confidence_threshold: 0.7
+  clarification_prompt: |
+    I'm not sure I understand your request. Could you clarify:
+    1. Are you asking a knowledge question about documents?
+    2. Do you need data analysis or MongoDB queries?
+    3. Do you have an image, PDF, or document to analyze?
+    4. Do you have audio to transcribe?
+    5. Do you need live web research?
+    6. Do you want me to perform an action (send email, write to DB, etc.)?
+
+# Agentic RAG Subgraph
+rag_agent:
+  model_role: "generator_llm"
+  temperature: 0.2
+  max_tokens: 4096
+  query_rewrite:
+    enabled: true
+    model_role: "supervisor_llm"
+    max_subqueries: 3
+  retrieval:
+    hybrid: true
+    vector_weight: 0.7
+    keyword_weight: 0.3
+    top_k: 20
+    rerank_top_k: 5
+    metadata_filters: true
+  reranker:
+    model_role: "reranker"
+    enabled: true
+  grading:
+    relevance_threshold: 0.6
+    max_rewrite_attempts: 2
+  generation:
+    groundedness_check: true
+    citation_required: true
+    max_citations: 5
+
+# Data Analyst Agent
+data_analyst:
+  model_role: "code_llm"
+  temperature: 0.1
+  max_tokens: 4096
+  mongo_read_only: true
+  max_rows: 1000
+  query_timeout_seconds: 30
+  allowed_operations:
+    - "find"
+    - "aggregate"
+    - "count"
+    - "distinct"
+  forbidden_operations:
+    - "insert"
+    - "update"
+    - "delete"
+    - "drop"
+    - "createIndex"
+    - "dropIndex"
+
+# Vision Agent
+vision_agent:
+  model_role: "vision_llm"
+  temperature: 0.2
+  max_tokens: 4096
+  ocr_model_role: "ocr"
+  supported_formats:
+    - "png"
+    - "jpg"
+    - "jpeg"
+    - "webp"
+    - "pdf"
+  max_image_size_mb: 20
+
+# Speech Agent
+speech_agent:
+  asr_model_role: "asr"
+  tts_model_role: "tts"
+  supported_audio_formats:
+    - "wav"
+    - "mp3"
+    - "m4a"
+    - "flac"
+  max_audio_duration_seconds: 300
+  sample_rate: 16000
+
+# Web Research Agent
+web_research_agent:
+  model_role: "generator_llm"
+  temperature: 0.3
+  max_tokens: 4096
+  search_engine: "duckduckgo"  # or "google", "bing"
+  max_search_results: 10
+  max_pages_to_fetch: 5
+  fetch_timeout_seconds: 10
+  domain_allowlist: []
+  domain_denylist: []
+  summarize_model_role: "supervisor_llm"
+
+# Action Agent
+action_agent:
+  model_role: "generator_llm"
+  temperature: 0.1
+  max_tokens: 4096
+  tool_registry: "tools/registry.py"
+  dry_run_mode: false
+  idempotency_keys: true
+  audit_trail: true
+  max_tool_calls: 5
+  human_approval_tools:
+    - "email_send"
+    - "db_write"
+    - "db_delete"
+    - "file_delete"
+    - "calendar_write"
+
+# Critic / Reflection Node
+critic:
+  model_role: "reasoning_llm"
+  temperature: 0.1
+  max_tokens: 2048
+  max_retries: 2
+  evaluation_criteria:
+    - "groundedness"
+    - "completeness"
+    - "accuracy"
+    - "safety"
+    - "clarity"
+  score_threshold: 0.7
+
+# Memory
+memory:
+  short_term:
+    enabled: true
+    summarization_threshold: 8000  # tokens
+    summarization_model_role: "supervisor_llm"
+  long_term:
+    enabled: true
+    model_role: "embedding"
+    pii_check_before_store: true
+    user_control_endpoint: true  # GDPR-style view/delete
+
+# Human-in-the-Loop
+hitl:
+  enabled: true
+  approval_timeout_minutes: 30
+  notification_channels:
+    - "webhook"
+    - "email"
+  default_decision: "reject"

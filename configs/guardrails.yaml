@@ -1,0 +1,188 @@
+# NIM Sentinel Guardrails Configuration
+# Version: 1.0
+
+# Input Guardrails
+input_guards:
+  # Jailbreak detection
+  jailbreak:
+    enabled: true
+    model: "nvidia/llama-3.1-nemoguard-8b-jailbreak-detect"
+    threshold: 0.7
+    action: "block"  # block, flag, log
+    fallback_models:
+      - "meta/llama-guard-4-12b"
+
+  # Content safety
+  content_safety:
+    enabled: true
+    model: "nvidia/llama-3.1-nemoguard-8b-content-safety"
+    threshold: 0.7
+    action: "block"
+    categories:
+      - "hate"
+      - "harassment"
+      - "violence"
+      - "sexual"
+      - "self-harm"
+    fallback_models:
+      - "ibm/granite-guardian-3.0-8b"
+
+  # Topic control
+  topic_control:
+    enabled: true
+    model: "nvidia/llama-3.1-nemoguard-8b-topic-control"
+    threshold: 0.7
+    action: "block"
+    allowed_topics:
+      - "enterprise_knowledge"
+      - "data_analysis"
+      - "document_processing"
+      - "code_generation"
+      - "general_qa"
+    blocked_topics:
+      - "politics"
+      - "religion"
+      - "personal_advice"
+      - "medical_advice"
+      - "legal_advice"
+      - "financial_advice"
+    fallback_models:
+      - "meta/llama-guard-4-12b"
+
+  # PII detection
+  pii_detection:
+    enabled: true
+    use_presidio: true
+    use_llm_fallback: true
+    llm_model: "meta/llama-3.1-8b-instruct"
+    entities:
+      - "PERSON"
+      - "EMAIL_ADDRESS"
+      - "PHONE_NUMBER"
+      - "CREDIT_CARD"
+      - "US_SSN"
+      - "IN_AADHAAR"
+      - "IN_PAN"
+      - "IP_ADDRESS"
+      - "API_KEY"
+      - "PASSWORD"
+    action: "redact"  # redact, block, flag
+
+  # Indirect injection defense
+  indirect_injection:
+    enabled: true
+    delimiters: true
+    strip_instructions: true
+    tool_call_confirmation: true
+    max_context_chars: 50000
+
+  # Input validation
+  input_validation:
+    enabled: true
+    max_chars: 100000
+    max_files: 10
+    max_file_size_mb: 50
+    allowed_mime_types:
+      - "application/pdf"
+      - "text/plain"
+      - "text/csv"
+      - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      - "image/png"
+      - "image/jpeg"
+      - "image/webp"
+      - "audio/wav"
+      - "audio/mp3"
+      - "audio/m4a"
+    malware_scan: false  # hook for external scanner
+
+# Output Guardrails
+output_guards:
+  # Content safety on output
+  content_safety:
+    enabled: true
+    model: "nvidia/llama-3.1-nemoguard-8b-content-safety"
+    threshold: 0.7
+    action: "regenerate"  # regenerate, redact, block
+
+  # Groundedness check
+  groundedness:
+    enabled: true
+    model: "meta/llama-3.3-70b-instruct"
+    threshold: 0.7
+    action: "regenerate"
+    max_retries: 2
+    require_citations: true
+
+  # PII/Secret leakage
+  pii_leakage:
+    enabled: true
+    use_presidio: true
+    patterns:
+      - "api[_-]?key"
+      - "secret[_-]?key"
+      - "access[_-]?token"
+      - "password"
+      - "bearer\\s+[a-zA-Z0-9_-]+"
+    action: "redact"
+
+  # Citation requirement
+  citations:
+    enabled: true
+    min_citations: 1
+    action: "regenerate"
+
+  # Schema validation
+  schema_validation:
+    enabled: true
+    strict_mode: true
+
+# Tool/Action Safety
+tool_safety:
+  # Allowlist-only tools
+  allowlist_only: true
+  allowed_tools:
+    - "mongo_query"
+    - "web_search"
+    - "calculator"
+    - "doc_search"
+    - "doc_upload"
+    - "email_draft"
+    - "calendar_check"
+
+  # Per-role permissions
+  role_permissions:
+    admin: ["*"]
+    analyst: ["mongo_query", "web_search", "calculator", "doc_search", "doc_upload"]
+    viewer: ["doc_search", "calculator"]
+
+  # Argument validation
+  argument_validation: true
+
+  # Read-only MongoDB mode
+  mongo_read_only: true
+
+  # Limits
+  max_steps: 10
+  max_loops: 3
+  max_tokens_per_request: 100000
+  max_cost_usd_per_request: 5.0
+
+  # Human approval
+  human_approval_required:
+    - "email_send"
+    - "db_write"
+    - "db_delete"
+    - "file_delete"
+    - "calendar_write"
+
+  # Audit logging
+  audit_log: true
+
+# Governance
+governance:
+  policy_version: "1.0"
+  log_all_decisions: true
+  langsmith_feedback: true
+  redteam_threshold: 0.05  # max 5% attack success rate
+  benign_false_positive_threshold: 0.02  # max 2% false positive on benign
