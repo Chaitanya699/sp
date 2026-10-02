@@ -312,11 +312,19 @@ class DatabaseError(NIMException):
         )
 
 
+class TenantIsolationError(DatabaseError):
+    """Raised when tenant isolation is violated."""
+
+    def __init__(self, message: str):
+        super().__init__(message, "tenant_isolation")
+        self.status_code = 403
+
+
 class MongoConnectionError(DatabaseError):
     """Raised when MongoDB connection fails."""
 
-    def __init__(self, details: dict[str, Any] | None = None):
-        super().__init__("Failed to connect to MongoDB", "connect", details)
+    def __init__(self, message: str = "Failed to connect to MongoDB", details: dict[str, Any] | None = None):
+        super().__init__(message, "connect", details)
 
 
 class MongoQueryError(DatabaseError):
@@ -409,6 +417,17 @@ class DocumentError(NIMException):
 
     def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(message, code="DOCUMENT_ERROR", details=details, status_code=500)
+
+
+class DocumentNotFoundError(DocumentError):
+    """Raised when a document is not found."""
+
+    def __init__(self, document_id: str):
+        super().__init__(
+            f"Document not found: {document_id}",
+            {"document_id": document_id},
+        )
+        self.status_code = 404
 
 
 class DocumentParseError(DocumentError):

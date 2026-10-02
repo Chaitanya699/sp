@@ -1,0 +1,54 @@
+{
+  "indexes": [
+    {
+      "name": "vector_index",
+      "type": "vectorSearch",
+      "definition": {
+        "fields": [
+          {
+            "type": "vector",
+            "path": "embedding",
+            "numDimensions": 1024,
+            "similarity": "cosine"
+          },
+          {
+            "type": "filter",
+            "path": "tenant_id"
+          },
+          {
+            "type": "filter",
+            "path": "document_id"
+          },
+          {
+            "type": "filter",
+            "path": "embedding_model"
+          }
+        ]
+      }
+    },
+    {
+      "name": "fulltext_index",
+      "type": "search",
+      "definition": {
+        "mappings": {
+          "dynamic": false,
+          "fields": {
+            "content": {
+              "type": "string",
+              "analyzer": "lucene.standard"
+            },
+            "tenant_id": {
+              "type": "token"
+            },
+            "document_id": {
+              "type": "token"
+            },
+            "embedding_model": {
+              "type": "token"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
