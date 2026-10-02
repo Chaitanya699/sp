@@ -24,15 +24,15 @@
     "semantic_hash": ""
   },
   "pyproject.toml": {
-    "mtime": 1790870920.4190488,
-    "seen": 1790891922.0465136,
-    "ast_hash": "d9ddcf2ecf2e027d65b93cc1a8c5731d",
+    "mtime": 1790901198.0695336,
+    "seen": 1790969948.1242118,
+    "ast_hash": "b1ba71a4cf8c36bc81f55656693ba15e",
     "semantic_hash": ""
   },
   "scripts/check_models.py": {
-    "mtime": 1790857740.4278047,
-    "seen": 1790868444.087165,
-    "ast_hash": "bef1ae90acdd06c6871d8fa6f7caff7e",
+    "mtime": 1790895958.7635522,
+    "seen": 1790969948.1242118,
+    "ast_hash": "c13bb5327b30fe42528e83324a7c8e73",
     "semantic_hash": ""
   },
   "src/nim_sentinel/core/__init__.py": {
@@ -48,9 +48,9 @@
     "semantic_hash": ""
   },
   "src/nim_sentinel/core/constants.py": {
-    "mtime": 1790857555.9932673,
-    "seen": 1790868444.087165,
-    "ast_hash": "c6263f8e5a3d6e6bf747fe0657c49b20",
+    "mtime": 1790896688.5493639,
+    "seen": 1790969948.1242118,
+    "ast_hash": "48ccc7caf6a4bd7b1729b6fca223b86a",
     "semantic_hash": ""
   },
   "src/nim_sentinel/core/errors.py": {
@@ -60,15 +60,15 @@
     "semantic_hash": ""
   },
   "src/nim_sentinel/core/logging.py": {
-    "mtime": 1790868136.891407,
-    "seen": 1790868444.087165,
-    "ast_hash": "0e749924fcc2bd848cab64aef05e741d",
+    "mtime": 1790900385.5327857,
+    "seen": 1790969948.1242118,
+    "ast_hash": "53f965340f957b75a23cc3a6df9708f2",
     "semantic_hash": ""
   },
   "src/nim_sentinel/core/security.py": {
-    "mtime": 1790867330.6743586,
-    "seen": 1790868444.087165,
-    "ast_hash": "b4472d382fe9918febe292d2e2c039cb",
+    "mtime": 1790900385.5327857,
+    "seen": 1790969948.1242118,
+    "ast_hash": "2ae3eeee2da49f3e86c2b76a1695be97",
     "semantic_hash": ""
   },
   "src/nim_sentinel/llm/__init__.py": {
@@ -78,32 +78,32 @@
     "semantic_hash": ""
   },
   "src/nim_sentinel/llm/cost_tracker.py": {
-    "mtime": 1790891728.2461896,
-    "seen": 1790891922.0465136,
-    "ast_hash": "7378096980813f920c6ecef530727107",
+    "mtime": 1790899891.0230818,
+    "seen": 1790969948.1242118,
+    "ast_hash": "6447c15675657cef562cba2ed445125a",
     "semantic_hash": ""
   },
   "src/nim_sentinel/llm/model_registry.py": {
-    "mtime": 1790891728.176495,
-    "seen": 1790891922.0465136,
-    "ast_hash": "eff53763d572b19e34baabe2da2b5db3",
+    "mtime": 1790900385.5327857,
+    "seen": 1790969948.1242118,
+    "ast_hash": "0ed75371559e00f2e8e32b811feaa554",
     "semantic_hash": ""
   },
   "src/nim_sentinel/llm/riva_adapter.py": {
-    "mtime": 1790868129.372471,
-    "seen": 1790868444.087165,
+    "mtime": 1790900385.5327857,
+    "seen": 1790969948.1242118,
     "ast_hash": "9c1c4633bc46a2903dbaaca2200d8a65",
     "semantic_hash": ""
   },
   "tests/test_model_registry.py": {
-    "mtime": 1790866912.6335826,
-    "seen": 1790868444.087165,
+    "mtime": 1790900385.5327857,
+    "seen": 1790969948.1242118,
     "ast_hash": "9a4b0fdf3b5f6241ca6b4ae749b235ed",
     "semantic_hash": ""
   },
   "tests/test_riva_adapter.py": {
-    "mtime": 1790859182.7033815,
-    "seen": 1790868444.087165,
+    "mtime": 1790900385.5327857,
+    "seen": 1790969948.1242118,
     "ast_hash": "9359800978ad3edf301a77f7a354b6d3",
     "semantic_hash": ""
   },
@@ -210,9 +210,9 @@
     "semantic_hash": ""
   },
   "configs/models.yaml": {
-    "mtime": 1790864400.9029672,
-    "seen": 1790868444.087165,
-    "ast_hash": "e16de01f982cf7cdf76ab96f358ae949",
+    "mtime": 1790895901.8659177,
+    "seen": 1790969948.1242118,
+    "ast_hash": "6f9f72faa17a2e2b1f834eeb0dfc66d2",
     "semantic_hash": ""
   },
   "deploy/docker/docker-compose.yml": {
@@ -234,9 +234,21 @@
     "semantic_hash": ""
   },
   "docs/PROGRESS.md": {
-    "mtime": 1790868370.6700857,
-    "seen": 1790868444.087165,
-    "ast_hash": "7a63128610ce8105e131ef7a3f4f5144",
+    "mtime": 1790969793.4394848,
+    "seen": 1790969948.1242118,
+    "ast_hash": "baa89f721dd98d5a16514d9c75f80541",
+    "semantic_hash": ""
+  },
+  "tests/test_cost_tracker.py": {
+    "mtime": 1790900411.947085,
+    "seen": 1790969948.1242118,
+    "ast_hash": "9abbae03cf4f5387718b5c4cc65c9f72",
+    "semantic_hash": ""
+  },
+  "docs/graph/GRAPH_REPORT.md": {
+    "mtime": 1790896043.2081714,
+    "seen": 1790969948.1242118,
+    "ast_hash": "71ff2160c3adab8850ac5fd5500542b0",
     "semantic_hash": ""
   }
 }
