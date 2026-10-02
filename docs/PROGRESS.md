@@ -123,9 +123,9 @@ Ran `scripts/check_models.py` with actual NVIDIA API key. Results:
 - **gitleaks** in pre-commit and CI
 
 ### 11. Code Quality ✅
-- **ruff**: All checks pass (56 tests)
+- **ruff**: All checks pass (95 tests)
 - **mypy**: Type checking passes (excluding transformers internal error)
-- **pytest**: 56 tests pass (38 model_registry + 18 riva_adapter)
+- **pytest**: 95 tests pass (38 model_registry + 18 riva_adapter + 39 cost_tracker)
 
 ### 12. Post-Phase 1 Fixes (6 items) ✅
 1. **pyproject.toml**: Removed `gitleaks` from PyPI deps (Go binary), migrated `tool.uv.dev-dependencies` → `[dependency-groups].dev`, set `requires-python = ">=3.11,<3.13"`, added `nvidia-riva-client` dependency. `uv sync` + `uv run pytest --cov=src -q` passes (74% coverage).
