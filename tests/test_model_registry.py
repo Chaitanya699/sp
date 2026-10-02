@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from langchain_nvidia_ai_endpoints import ChatNVIDIA, NVIDIAEmbeddings, NVIDIARerank
-
 from nim_sentinel.core import FallbackExhaustedError, ModelRole, ModelUnavailableError
 from nim_sentinel.llm.model_registry import (
     CircuitBreaker,

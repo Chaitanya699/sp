@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import grpc
+from nim_sentinel.core import ModelRole, ModelUnavailableError
+from nim_sentinel.core.logging import get_logger
 from riva.client import (
     ASRService,
     AudioEncoding,
@@ -20,9 +22,6 @@ from riva.client import (
     SpeechSynthesisService,
     StreamingRecognitionConfig,
 )
-
-from nim_sentinel.core import ModelRole, ModelUnavailableError
-from nim_sentinel.core.logging import get_logger
 
 logger = get_logger(__name__)
 

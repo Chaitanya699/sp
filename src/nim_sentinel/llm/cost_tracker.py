@@ -59,10 +59,19 @@ class AggregatedCosts:
         else:
             self.failed_calls += 1
 
-        # Per-model aggregation
+        # Per-model aggregation (avoid recursion by updating fields directly)
         if snapshot.model_id not in self.by_model:
             self.by_model[snapshot.model_id] = AggregatedCosts(role=snapshot.model_id)
-        self.by_model[snapshot.model_id].add(snapshot)
+        model_agg = self.by_model[snapshot.model_id]
+        model_agg.total_calls += 1
+        model_agg.total_tokens_in += snapshot.tokens_in
+        model_agg.total_tokens_out += snapshot.tokens_out
+        model_agg.total_latency_ms += snapshot.latency_ms
+        model_agg.total_cost_usd += snapshot.cost_usd
+        if snapshot.success:
+            model_agg.successful_calls += 1
+        else:
+            model_agg.failed_calls += 1
 
     @property
     def avg_latency_ms(self) -> float:

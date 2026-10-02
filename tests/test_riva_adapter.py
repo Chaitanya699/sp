@@ -5,7 +5,6 @@ Tests for Riva ASR/TTS Adapter
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from nim_sentinel.llm.riva_adapter import (
     RivaASRAdapter,
     RivaConfig,
@@ -131,7 +130,6 @@ class TestRivaASRAdapter:
     def test_transcribe_offline_error(self, mock_asr_service, mock_auth):
         """Test offline transcription error handling."""
         import grpc
-
         from nim_sentinel.core import ModelUnavailableError
         mock_asr_service.return_value.offline_recognize.side_effect = grpc.RpcError()
 
@@ -188,7 +186,6 @@ class TestRivaTTSAdapter:
     def test_synthesize_error(self, mock_tts_service, mock_auth):
         """Test speech synthesis error handling."""
         import grpc
-
         from nim_sentinel.core import ModelUnavailableError
         mock_tts_service.return_value.synthesize.side_effect = grpc.RpcError()
 

@@ -207,6 +207,8 @@ module = [
     "yaml",
     "structlog",
     "structlog.*",
+    "transformers",
+    "transformers.*",
 ]
 ignore_missing_imports = true
 

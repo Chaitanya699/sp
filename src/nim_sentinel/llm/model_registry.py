@@ -16,7 +16,6 @@ from typing import Any, TypeVar
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
 from langchain_nvidia_ai_endpoints import ChatNVIDIA, NVIDIAEmbeddings, NVIDIARerank
-
 from nim_sentinel.core import (
     FallbackExhaustedError,
     ModelRole,

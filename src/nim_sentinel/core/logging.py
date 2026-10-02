@@ -14,7 +14,6 @@ from typing import Any
 
 import structlog
 import yaml
-
 from nim_sentinel.core.config import get_settings
 
 # Context variables for correlation tracking
