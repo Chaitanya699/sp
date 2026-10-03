@@ -2,11 +2,15 @@
 NIM Sentinel Database Module
 
 MongoDB async client and repositories with tenant isolation.
+Uses pymongo.AsyncMongoClient (Motor is deprecated).
 """
 
 from nim_sentinel.db.client import (
     MongoClient,
     close_mongo_client,
+    close_mongo_connection,
+    connect_to_mongo,
+    get_database,
     get_mongo_client,
     mongo_session,
 )
@@ -23,6 +27,9 @@ __all__ = [
     "MongoClient",
     "get_mongo_client",
     "close_mongo_client",
+    "close_mongo_connection",
+    "connect_to_mongo",
+    "get_database",
     "mongo_session",
     "DocumentRepository",
     "ChunkRepository",

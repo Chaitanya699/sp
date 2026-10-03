@@ -115,7 +115,7 @@ def create_access_token(
     }
 
     encoded_jwt = jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
-    return encoded_jwt  # type: ignore[no-any-return]
+    return encoded_jwt
 
 
 def decode_token(token: str) -> TokenData:
@@ -137,12 +137,12 @@ def decode_token(token: str) -> TokenData:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)  # type: ignore[no-any-return]
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password."""
-    return pwd_context.hash(password)  # type: ignore[no-any-return]
+    return pwd_context.hash(password)
 
 
 def generate_api_key() -> str:

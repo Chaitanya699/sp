@@ -42,7 +42,7 @@ class TestMongoClient:
     @pytest.mark.asyncio
     async def test_connect_success(self, mock_settings):
         """Test successful connection."""
-        with patch("nim_sentinel.db.client.AsyncIOMotorClient") as mock_client_class:
+        with patch("nim_sentinel.db.client.AsyncMongoClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.admin.command = AsyncMock(return_value={"ok": 1})
             mock_client_class.return_value = mock_client
@@ -59,7 +59,7 @@ class TestMongoClient:
         """Test connection failure."""
         from pymongo.errors import ServerSelectionTimeoutError
 
-        with patch("nim_sentinel.db.client.AsyncIOMotorClient") as mock_client_class:
+        with patch("nim_sentinel.db.client.AsyncMongoClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.admin.command = AsyncMock(side_effect=ServerSelectionTimeoutError("timeout"))
             mock_client_class.return_value = mock_client
@@ -83,7 +83,7 @@ class TestMongoClient:
     @pytest.mark.asyncio
     async def test_disconnect(self, mock_settings):
         """Test disconnection."""
-        with patch("nim_sentinel.db.client.AsyncIOMotorClient") as mock_client_class:
+        with patch("nim_sentinel.db.client.AsyncMongoClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.admin.command = AsyncMock(return_value={"ok": 1})
             mock_client_class.return_value = mock_client
@@ -95,12 +95,12 @@ class TestMongoClient:
             assert client._connected is False
             assert client._client is None
             assert client._db is None
-            mock_client.close.assert_called_once()
+            mock_client.close.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_health_check_connected(self, mock_settings):
         """Test health check when connected."""
-        with patch("nim_sentinel.db.client.AsyncIOMotorClient") as mock_client_class:
+        with patch("nim_sentinel.db.client.AsyncMongoClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.admin.command = AsyncMock(return_value={"ok": 1})
             mock_client_class.return_value = mock_client
@@ -130,11 +130,11 @@ class TestMongoClient:
     @pytest.mark.asyncio
     async def test_session_context_manager(self, mock_settings):
         """Test session context manager."""
-        with patch("nim_sentinel.db.client.AsyncIOMotorClient") as mock_client_class:
+        with patch("nim_sentinel.db.client.AsyncMongoClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.admin.command = AsyncMock(return_value={"ok": 1})
             mock_session = AsyncMock()
-            mock_client.start_session = AsyncMock(return_value=mock_session)
+            mock_client.start_session = MagicMock(return_value=mock_session)
             mock_client_class.return_value = mock_client
 
             client = MongoClient()
@@ -388,10 +388,9 @@ class TestChunkRepository:
             {"_id": ObjectId(), "content": "result 1", "score": 0.95},
             {"_id": ObjectId(), "content": "result 2", "score": 0.85},
         ]
-        repo._collection.aggregate = MagicMock()
         mock_cursor = AsyncMock()
         mock_cursor.to_list = AsyncMock(return_value=expected_results)
-        repo._collection.aggregate.return_value = mock_cursor
+        repo._collection.aggregate = AsyncMock(return_value=mock_cursor)
 
         query_embedding = [0.1] * 1024
         results = await repo.vector_search(query_embedding, "nvidia/nv-embedqa-e5-v5", top_k=5)
@@ -405,10 +404,9 @@ class TestChunkRepository:
         expected_results = [
             {"_id": ObjectId(), "content": "result 1", "score": 0.95},
         ]
-        repo._collection.aggregate = MagicMock()
         mock_cursor = AsyncMock()
         mock_cursor.to_list = AsyncMock(return_value=expected_results)
-        repo._collection.aggregate.return_value = mock_cursor
+        repo._collection.aggregate = AsyncMock(return_value=mock_cursor)
 
         results = await repo.text_search("test query", top_k=5)
 

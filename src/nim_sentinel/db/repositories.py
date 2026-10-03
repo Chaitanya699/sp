@@ -3,6 +3,7 @@ NIM Sentinel MongoDB Repositories
 
 Repository classes for documents, chunks, and sessions with tenant isolation.
 All queries require tenant_id - no query runs without it.
+Uses pymongo.AsyncMongoClient (Motor is deprecated).
 """
 
 import logging
@@ -10,7 +11,6 @@ from abc import ABC
 from datetime import UTC, datetime
 from typing import Any
 
-from motor.motor_asyncio import AsyncIOMotorCollection, AsyncIOMotorDatabase
 from nim_sentinel.core.constants import (
     COLLECTION_CHUNKS,
     COLLECTION_DOCUMENTS,
@@ -21,6 +21,8 @@ from nim_sentinel.core.errors import (
     TenantIsolationError,
 )
 from pymongo import ASCENDING, DESCENDING, IndexModel
+from pymongo.asynchronous.collection import AsyncCollection
+from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.errors import DuplicateKeyError, OperationFailure
 
 logger = logging.getLogger(__name__)
@@ -32,19 +34,19 @@ class BaseRepository(ABC):
     collection_name: str
     indexes: list[IndexModel] = []
 
-    def __init__(self, database: AsyncIOMotorDatabase, tenant_id: str):
+    def __init__(self, database: AsyncDatabase[Any], tenant_id: str):
         if not tenant_id:
             raise TenantIsolationError("tenant_id is required for all repository operations")
         self._db = database
         self._tenant_id = tenant_id
-        self._collection: AsyncIOMotorCollection = database[self.collection_name]
+        self._collection: AsyncCollection[Any] = database[self.collection_name]
 
     @property
     def tenant_id(self) -> str:
         return self._tenant_id
 
     @property
-    def collection(self) -> AsyncIOMotorCollection:
+    def collection(self) -> AsyncCollection[Any]:
         return self._collection
 
     def _add_tenant_filter(self, query: dict[str, Any]) -> dict[str, Any]:
@@ -61,15 +63,16 @@ class BaseRepository(ABC):
         if self.indexes:
             try:
                 await self._collection.create_indexes(self.indexes)
-                logger.info("Indexes created", collection=self.collection_name, tenant_id=self._tenant_id)
+                logger.info("Indexes created", extra={"collection": self.collection_name, "tenant_id": self._tenant_id})
             except OperationFailure as e:
-                logger.error("Failed to create indexes", collection=self.collection_name, error=str(e))
-                raise DatabaseError(f"Failed to create indexes: {e}") from e
+                logger.error("Failed to create indexes", extra={"collection": self.collection_name, "error": str(e)})
+                raise DatabaseError(f"Failed to create indexes: {e}", operation="create_indexes") from e
 
     async def find_one(self, query: dict[str, Any], projection: dict[str, Any] | None = None) -> dict[str, Any] | None:
         """Find single document with tenant isolation."""
         filtered_query = self._add_tenant_filter(query)
-        return await self._collection.find_one(filtered_query, projection=projection)
+        result = await self._collection.find_one(filtered_query, projection=projection)
+        return result if result is None else dict(result)
 
     async def find_many(
         self,
@@ -88,7 +91,8 @@ class BaseRepository(ABC):
             cursor = cursor.skip(skip)
         if limit:
             cursor = cursor.limit(limit)
-        return await cursor.to_list(length=limit)
+        results = await cursor.to_list(length=limit)
+        return [dict(r) for r in results]
 
     async def count(self, query: dict[str, Any]) -> int:
         """Count documents with tenant isolation."""
@@ -97,12 +101,12 @@ class BaseRepository(ABC):
 
     async def insert_one(self, document: dict[str, Any]) -> str:
         """Insert document with tenant_id."""
-        document = {**document, "tenant_id": self._tenant_id, "created_at": datetime.now(UTC)}
+        doc = {**document, "tenant_id": self._tenant_id, "created_at": datetime.now(UTC)}
         try:
-            result = await self._collection.insert_one(document)
+            result = await self._collection.insert_one(doc)
             return str(result.inserted_id)
         except DuplicateKeyError as e:
-            raise DatabaseError(f"Duplicate key error: {e}") from e
+            raise DatabaseError(f"Duplicate key error: {e}", operation="insert_one") from e
 
     async def insert_many(self, documents: list[dict[str, Any]]) -> list[str]:
         """Insert multiple documents with tenant_id."""
@@ -116,7 +120,7 @@ class BaseRepository(ABC):
             result = await self._collection.insert_many(docs_with_tenant)
             return [str(id_) for id_ in result.inserted_ids]
         except DuplicateKeyError as e:
-            raise DatabaseError(f"Duplicate key error: {e}") from e
+            raise DatabaseError(f"Duplicate key error: {e}", operation="insert_many") from e
 
     async def update_one(
         self,
@@ -154,8 +158,9 @@ class BaseRepository(ABC):
         # Inject tenant_id at the beginning of pipeline
         tenant_match = {"$match": {"tenant_id": self._tenant_id}}
         full_pipeline = [tenant_match, *pipeline]
-        cursor = self._collection.aggregate(full_pipeline)
-        return await cursor.to_list(length=None)
+        cursor = await self._collection.aggregate(full_pipeline)
+        results = await cursor.to_list(length=None)
+        return [dict(r) for r in results]
 
 
 class DocumentRepository(BaseRepository):
@@ -310,8 +315,9 @@ class ChunkRepository(BaseRepository):
     ) -> list[dict[str, Any]]:
         """
         Perform vector search using MongoDB Atlas Vector Search.
-        Requires vector search index to be created.
+        Falls back to manual cosine similarity for local MongoDB.
         """
+        # Try Atlas Vector Search first
         pipeline: list[dict[str, Any]] = [
             {
                 "$vectorSearch": {
@@ -338,11 +344,65 @@ class ChunkRepository(BaseRepository):
         try:
             return await self.aggregate(pipeline)
         except OperationFailure as e:
-            if "vectorSearch" in str(e):
-                raise DatabaseError(
-                    "Vector search index not found. Run create_indexes.py first."
-                ) from e
+            if "vectorSearch" in str(e) or "SearchNotEnabled" in str(e) or "CommandNotFound" in str(e):
+                # Fallback to manual cosine similarity for local MongoDB
+                return await self._manual_vector_search(query_embedding, embedding_model, top_k, filter_query)
             raise
+
+    async def _manual_vector_search(
+        self,
+        query_embedding: list[float],
+        embedding_model: str,
+        top_k: int = 20,
+        filter_query: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Manual cosine similarity search for local MongoDB without Atlas Search.
+        """
+        import numpy as np
+
+        # Build filter
+        filter_dict = self._add_tenant_filter(filter_query or {})
+        filter_dict["embedding_model"] = embedding_model
+        filter_dict["embedding"] = {"$exists": True, "$ne": None}
+
+        # Fetch all chunks with embeddings
+        cursor = self._collection.find(filter_dict, projection={
+            "content": 1,
+            "document_id": 1,
+            "chunk_index": 1,
+            "metadata": 1,
+            "embedding_model": 1,
+            "embedding": 1,
+        })
+        chunks = await cursor.to_list(length=None)
+
+        if not chunks:
+            return []
+
+        # Compute cosine similarities
+        query_vec = np.array(query_embedding)
+        results = []
+
+        for chunk in chunks:
+            emb = chunk.get("embedding")
+            if emb is None:
+                continue
+            chunk_vec = np.array(emb)
+            # Cosine similarity
+            sim = float(np.dot(query_vec, chunk_vec) / (np.linalg.norm(query_vec) * np.linalg.norm(chunk_vec)))
+            results.append({
+                "content": chunk["content"],
+                "document_id": chunk["document_id"],
+                "chunk_index": chunk["chunk_index"],
+                "metadata": chunk.get("metadata", {}),
+                "embedding_model": chunk.get("embedding_model", embedding_model),
+                "score": sim,
+            })
+
+        # Sort by similarity descending
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return results[:top_k]
 
     async def text_search(
         self,
@@ -352,8 +412,9 @@ class ChunkRepository(BaseRepository):
     ) -> list[dict[str, Any]]:
         """
         Perform full-text search using MongoDB Atlas Search.
-        Requires text search index to be created.
+        Falls back to regex search for local MongoDB.
         """
+        # Try Atlas Search first
         pipeline: list[dict[str, Any]] = [
             {
                 "$search": {
@@ -380,11 +441,66 @@ class ChunkRepository(BaseRepository):
         try:
             return await self.aggregate(pipeline)
         except OperationFailure as e:
-            if "search" in str(e).lower():
-                raise DatabaseError(
-                    "Full-text search index not found. Run create_indexes.py first."
-                ) from e
+            if "search" in str(e).lower() or "SearchNotEnabled" in str(e) or "CommandNotFound" in str(e):
+                # Fallback to regex search for local MongoDB
+                return await self._manual_text_search(query, top_k, filter_query)
             raise
+
+    async def _manual_text_search(
+        self,
+        query: str,
+        top_k: int = 20,
+        filter_query: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Manual text search using regex for local MongoDB without Atlas Search.
+        """
+        import re
+
+        # Build filter
+        filter_dict = self._add_tenant_filter(filter_query or {})
+
+        # Create regex pattern from query words
+        words = query.split()
+        if not words:
+            return []
+
+        # Build regex that matches any of the words (case insensitive)
+        pattern = "|".join(re.escape(w) for w in words)
+        filter_dict["content"] = {"$regex": pattern, "$options": "i"}
+
+        # Fetch matching chunks
+        cursor = self._collection.find(filter_dict, projection={
+            "content": 1,
+            "document_id": 1,
+            "chunk_index": 1,
+            "metadata": 1,
+            "embedding_model": 1,
+        }).limit(top_k * 3)  # Get more for scoring
+
+        chunks = await cursor.to_list(length=None)
+
+        if not chunks:
+            return []
+
+        # Simple scoring: count word matches
+        results = []
+        for chunk in chunks:
+            content = chunk["content"].lower()
+            score = sum(1 for w in words if w.lower() in content)
+            if score > 0:
+                results.append({
+                    "content": chunk["content"],
+                    "document_id": chunk["document_id"],
+                    "chunk_index": chunk["chunk_index"],
+                    "metadata": chunk.get("metadata", {}),
+                    "embedding_model": chunk.get("embedding_model", ""),
+                    "score": float(score),
+                })
+
+        # Sort by score descending
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return results[:top_k]
 
 
 class SessionRepository(BaseRepository):
@@ -466,16 +582,16 @@ class SessionRepository(BaseRepository):
         return await self.update_one({"thread_id": thread_id}, {"status": "deleted"})
 
 
-def get_document_repository(database: AsyncIOMotorDatabase, tenant_id: str) -> DocumentRepository:
+def get_document_repository(database: AsyncDatabase[Any], tenant_id: str) -> DocumentRepository:
     """Factory for DocumentRepository."""
     return DocumentRepository(database, tenant_id)
 
 
-def get_chunk_repository(database: AsyncIOMotorDatabase, tenant_id: str) -> ChunkRepository:
+def get_chunk_repository(database: AsyncDatabase[Any], tenant_id: str) -> ChunkRepository:
     """Factory for ChunkRepository."""
     return ChunkRepository(database, tenant_id)
 
 
-def get_session_repository(database: AsyncIOMotorDatabase, tenant_id: str) -> SessionRepository:
+def get_session_repository(database: AsyncDatabase[Any], tenant_id: str) -> SessionRepository:
     """Factory for SessionRepository."""
     return SessionRepository(database, tenant_id)

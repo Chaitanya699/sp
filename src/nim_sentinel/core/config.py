@@ -95,7 +95,14 @@ class Settings(BaseSettings):
 
     # MongoDB
     mongodb_uri: str = Field(default="mongodb://localhost:27017", description="MongoDB connection URI")
+    mongodb_local_uri: str = Field(default="mongodb://localhost:27017", description="MongoDB local connection URI")
     mongodb_database: str = Field(default="nim_sentinel", description="MongoDB database name")
+    mongodb_max_pool_size: int = Field(default=100, description="MongoDB max pool size")
+    mongodb_min_pool_size: int = Field(default=10, description="MongoDB min pool size")
+    mongodb_max_idle_time_ms: int = Field(default=30000, description="MongoDB max idle time ms")
+    mongodb_server_selection_timeout_ms: int = Field(default=5000, description="MongoDB server selection timeout ms")
+    mongodb_connect_timeout_ms: int = Field(default=10000, description="MongoDB connect timeout ms")
+    mongodb_socket_timeout_ms: int = Field(default=20000, description="MongoDB socket timeout ms")
 
     # Redis
     redis_url: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
@@ -128,6 +135,13 @@ class Settings(BaseSettings):
     feature_speech: bool = Field(default=False, description="Enable speech agent")
     feature_web_research: bool = Field(default=True, description="Enable web research agent")
     feature_action_agent: bool = Field(default=True, description="Enable action agent")
+
+    # RAG/Ingestion
+    embedding_model: str = Field(default="", description="Embedding model (empty = use model registry)")
+    chunk_size: int = Field(default=512, description="Chunk size in tokens")
+    chunk_overlap: int = Field(default=50, description="Chunk overlap in tokens")
+    embedding_batch_size: int = Field(default=32, description="Embedding batch size")
+    embedding_max_concurrent: int = Field(default=4, description="Max concurrent embedding requests")
 
     # Computed paths
     config_dir: Path = Field(default=Path("configs"), description="Config directory")

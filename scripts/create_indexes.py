@@ -29,7 +29,7 @@ def load_models_config() -> dict:
 def get_embedding_dimension(models_config: dict) -> int:
     """Get embedding dimension from models.yaml."""
     # Primary embedding model
-    embedding_config = models_config.get("roles", {}).get("embedding", {})
+    embedding_config = models_config.get("model_registry", {}).get("embedding", {})
     primary_model = embedding_config.get("primary", "")
 
     # Known model dimensions
@@ -38,6 +38,7 @@ def get_embedding_dimension(models_config: dict) -> int:
         "nvidia/llama-3.2-nv-embedqa-1b-v2": 1024,
         "nvidia/nv-embed-v1": 1024,
         "baai/bge-m3": 1024,
+        "nvidia/nemotron-3-embed-1b": 2048,
     }
 
     dimension = model_dimensions.get(primary_model)
@@ -77,7 +78,7 @@ def validate_dimension(index_def: dict, expected_dim: int) -> None:
             f"but models.yaml specifies {expected_dim} for embedding model. "
             f"Update configs/mongo_indexes/chunks_indexes.json or configs/models.yaml"
         )
-    print(f"✓ Dimension validated: {actual_dim} dimensions")
+    print(f"[OK] Dimension validated: {actual_dim} dimensions")
 
 
 async def create_indexes() -> None:
@@ -133,22 +134,22 @@ async def create_indexes() -> None:
                     type=idx_type,
                     definition=definition,
                 )
-            print(f"✓ Index '{name}' created successfully")
+            print(f"[OK] Index '{name}' created successfully")
         except OperationFailure as e:
             if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
-                print(f"✓ Index '{name}' already exists")
+                print(f"[OK] Index '{name}' already exists")
             else:
-                print(f"✗ Failed to create index '{name}': {e}")
+                print(f"[FAIL] Failed to create index '{name}': {e}")
                 raise
         except Exception as e:
             # Some MongoDB deployments don't support createSearchIndex command
             # Fall back to manual instruction
-            print(f"⚠ Could not create index programmatically: {e}")
+            print(f"[WARN] Could not create index programmatically: {e}")
             print(f"  Please create index '{name}' manually in Atlas UI:")
             print(f"  {json.dumps(definition, indent=2)}")
 
     client.close()
-    print("\n✓ All indexes processed")
+    print("[OK] All indexes processed")
 
 
 if __name__ == "__main__":
@@ -157,5 +158,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(create_indexes())
     except Exception as e:
-        print(f"✗ Error: {e}", file=sys.stderr)
+        print(f"[FAIL] Error: {e}", file=sys.stderr)
         sys.exit(1)

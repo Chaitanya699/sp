@@ -10,7 +10,7 @@ import re
 import uuid
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Mapping, MutableMapping
 
 import structlog
 import yaml
@@ -65,8 +65,8 @@ class PIIRedactionFilter(logging.Filter):
 
 
 def add_correlation_id(
-    logger: Any, method_name: str, event_dict: dict[str, Any]
-) -> dict[str, Any]:
+    logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+) -> Mapping[str, Any] | str | bytes | bytearray | tuple[Any, ...]:
     """Add correlation ID and context to log events."""
     corr_id = correlation_id_var.get()
     if corr_id:
@@ -125,8 +125,8 @@ def setup_logging(config_path: str | None = None) -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
-            add_correlation_id,  # type: ignore[list-item]
-            structlog.processors.JSONRenderer() if settings.log_format == "json" else structlog.dev.ConsoleRenderer(),
+            add_correlation_id,
+            structlog.processors.JSONRenderer() if settings.log_format == "json" else structlog.dev.ConsoleRenderer(),  # type: ignore[list-item]
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
