@@ -126,9 +126,8 @@ async def main():
         print("ERROR: NVIDIA_API_KEY not configured in .env")
         return 1
 
-    # Mask key for display
-    masked_key = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
-    print(f"Using NVIDIA API Key: {masked_key}")
+    # Mask key for display - don't print any part of the key
+    print("Using NVIDIA API Key: [REDACTED]")
 
     # Get models from config
     embedding_config = get_model_config("embedding")
