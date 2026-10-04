@@ -41,6 +41,8 @@ def get_embedding_dimension(models_config: dict) -> int:
         "nvidia/nv-embed-v1": 1024,
         "baai/bge-m3": 1024,
         "nvidia/nemotron-3-embed-1b": 2048,
+        "nvidia/llama-nemotron-embed-1b-v2": 1024,
+        "nvidia/llama-3.2-nv-embedqa-1b-v1": 1024,
     }
 
     dimension = model_dimensions.get(primary_model)
