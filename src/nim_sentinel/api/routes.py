@@ -30,6 +30,7 @@ from nim_sentinel.db.repositories import (
 )
 from nim_sentinel.rag.ingestion.pipeline import IngestionConfig, IngestionPipeline
 from nim_sentinel.rag.retriever import get_hybrid_retriever
+from nim_sentinel.graph.main_graph import run_graph
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -477,6 +478,126 @@ async def query_documents(
         total_results=len(results),
         latency_ms=latency_ms,
     )
+
+
+class AgentQueryRequest(BaseModel):
+    """Request model for /v1/agent/query endpoint (LangGraph-based)."""
+
+    query: str = Field(..., min_length=1, max_length=10000, description="Query text")
+    session_id: str = Field(..., min_length=1, max_length=100, description="Session ID for conversation continuity")
+    top_k: int = Field(default=10, ge=1, le=50, description="Number of results to return")
+    filter: dict[str, Any] | None = Field(default=None, description="Optional metadata filters")
+    include_citations: bool = Field(default=True, description="Include citations in response")
+
+
+class AgentQueryResponse(BaseModel):
+    """Response model for /v1/agent/query endpoint."""
+
+    query: str
+    answer: str
+    confidence: float
+    citations: list[dict[str, Any]] | None = None
+    retrieval_results: list[dict[str, Any]] | None = None
+    total_results: int
+    latency_ms: float
+    session_id: str
+
+
+@router.post(
+    "/agent/query",
+    response_model=AgentQueryResponse,
+    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def agent_query(
+    request: AgentQueryRequest,
+    user: TokenData = Depends(require_permission("chat")),
+    tenant_id: str = Depends(get_tenant_id),
+) -> AgentQueryResponse:
+    """
+    Query using the full LangGraph agent (supervisor -> RAG -> critic).
+
+    This endpoint uses the multi-agent graph with:
+    - Supervisor for routing
+    - RAG subgraph for retrieval and generation
+    - Critic for answer quality review
+    - MongoDB checkpointer for conversation persistence
+    """
+    import time
+
+    start_time = time.perf_counter()
+    correlation_id = generate_correlation_id()
+
+    # Sanitize query
+    query = sanitize_input(request.query, max_length=10000)
+
+    logger.info(
+        "Agent query received",
+        extra={
+            "correlation_id": correlation_id,
+            "query": query[:100],
+            "user": user.username,
+            "session_id": request.session_id,
+            "top_k": request.top_k,
+        },
+    )
+
+    try:
+        # Run the agent graph with MongoDB checkpointer
+        final_state = await run_graph(
+            query=query,
+            tenant_id=tenant_id,
+            user_id=user.sub,
+            session_id=request.session_id,
+            checkpointer=None,  # Will use default MongoDB checkpointer
+        )
+
+        # Prepare response
+        retrieval_results = []
+        for i, result in enumerate(final_state.retrieval_results):
+            retrieval_results.append(
+                {
+                    "rank": i + 1,
+                    "content": result.content,
+                    "document_id": result.document_id,
+                    "chunk_index": result.chunk_index,
+                    "score": result.score,
+                    "metadata": result.metadata,
+                    "source": result.source,
+                }
+            )
+
+        citations = final_state.citations if request.include_citations else None
+
+        latency_ms = (time.perf_counter() - start_time) * 1000
+
+        logger.info(
+            "Agent query completed",
+            extra={
+                "correlation_id": correlation_id,
+                "answer_length": len(final_state.answer),
+                "confidence": final_state.confidence,
+                "results_count": len(final_state.retrieval_results),
+                "latency_ms": latency_ms,
+            },
+        )
+
+        return AgentQueryResponse(
+            query=query,
+            answer=final_state.answer,
+            confidence=final_state.confidence,
+            citations=citations,
+            retrieval_results=retrieval_results,
+            total_results=len(final_state.retrieval_results),
+            latency_ms=latency_ms,
+            session_id=request.session_id,
+        )
+
+    except Exception as e:
+        logger.error(
+            "Agent query failed",
+            extra={"correlation_id": correlation_id, "error": str(e)},
+        )
+        raise HTTPException(status_code=500, detail=f"Agent query failed: {str(e)}") from e
 
 
 @router.get("/health")

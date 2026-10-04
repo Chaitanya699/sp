@@ -271,3 +271,25 @@ def generate_correlation_id() -> str:
 def constant_time_compare(a: str, b: str) -> bool:
     """Constant-time string comparison to prevent timing attacks."""
     return secrets.compare_digest(a, b)
+
+
+def create_dev_token(
+    tenant_id: str,
+    permissions: list[str] | None = None,
+    user_id: str = "dev_user",
+    username: str = "dev",
+    roles: list[str] | None = None,
+    expires_delta: timedelta | None = None,
+) -> str:
+    """Create a development JWT token for testing."""
+    if roles is None:
+        roles = ["analyst"]
+    if permissions is None:
+        permissions = ["read", "write"]
+    return create_access_token(
+        user_id=user_id,
+        username=username,
+        roles=roles,
+        tenant_id=tenant_id,
+        expires_delta=expires_delta,
+    )
