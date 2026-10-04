@@ -5,8 +5,8 @@
 
 model_registry:
   supervisor_llm:
-    primary: "meta/llama-3.1-8b-instruct"
-    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
+    primary: "nvidia/nemotron-3-ultra-550b-a55b"
+    fallback: ""
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
@@ -37,14 +37,14 @@ model_registry:
     max_retries: 3
 
   embedding:
-    primary: "snowflake/arctic-embed-l"
-    fallback: "nvidia/nv-embedcode-7b-v1"
+    primary: "nvidia/nemotron-3-embed-1b"
+    fallback: ""
     timeout_seconds: 30
     max_retries: 3
 
   reranker:
-    primary: "nvidia/llama-3.2-nv-rerankqa-1b-v2"
-    fallback: "nvidia/llama-nemotron-rerank-1b-v2"
+    primary: "nvidia/llama-nemotron-rerank-vl-1b-v2"
+    fallback: ""
     timeout_seconds: 30
     max_retries: 3
 

@@ -51,7 +51,7 @@ class WordEmbeddingMock:
 
 
 # Global instance for consistency across calls
-_word_embedder = WordEmbeddingMock(1024)
+_word_embedder = WordEmbeddingMock(2048)
 
 
 def mock_embed(text: str) -> list[float]:
