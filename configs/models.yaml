@@ -41,6 +41,7 @@ model_registry:
     fallback: ""
     timeout_seconds: 30
     max_retries: 3
+    dimension: 2048  # Verified via live API call
 
   reranker:
     primary: "nvidia/llama-nemotron-rerank-vl-1b-v2"

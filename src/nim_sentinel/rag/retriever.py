@@ -254,7 +254,7 @@ class HybridRetriever:
             return reranked[: self.final_top_k]
 
         except Exception as e:
-            logger.warning("Reranking failed, falling back to RRF scores: %s", e)
+            logger.warning("RERANKER FALLBACK: Reranking failed, falling back to RRF scores: %s", e)
             # Fallback to RRF scores
             candidates.sort(key=lambda x: x.get("rrf_score", 0), reverse=True)
             for c in candidates:
