@@ -38,8 +38,8 @@ class MongoClient:
 
         settings = get_settings()
 
-        # Prefer Atlas URI, fallback to local
-        uri = settings.mongodb_uri or settings.mongodb_local_uri
+        # Use effective URI based on mongo_target (local|atlas)
+        uri = settings.effective_mongodb_uri
         if not uri:
             raise MongoConnectionError(
                 "No MongoDB URI configured. Set MONGODB_URI or MONGODB_LOCAL_URI.",

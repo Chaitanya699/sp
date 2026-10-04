@@ -1,0 +1,12 @@
+This is a test document for NIM Sentinel.
+
+It contains some sample text that we can use to test the document upload and query functionality.
+
+The document discusses:
+1. Vector search capabilities
+2. Full-text search
+3. Hybrid retrieval with RRF fusion
+4. NVIDIA NIM integration
+5. Multi-tenant isolation
+
+This is just sample content for testing purposes.

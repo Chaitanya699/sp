@@ -36,6 +36,8 @@ class TestMongoClient:
             settings.mongodb_server_selection_timeout_ms = 5000
             settings.mongodb_connect_timeout_ms = 10000
             settings.mongodb_socket_timeout_ms = 20000
+            settings.mongo_target = "atlas"
+            settings.effective_mongodb_uri = "mongodb://localhost:27017"
             mock.return_value = settings
             yield settings
 
@@ -75,6 +77,7 @@ class TestMongoClient:
         """Test connection with no URI configured."""
         mock_settings.mongodb_uri = None
         mock_settings.mongodb_local_uri = None
+        mock_settings.effective_mongodb_uri = None
 
         client = MongoClient()
         with pytest.raises(MongoConnectionError, match="No MongoDB URI configured"):

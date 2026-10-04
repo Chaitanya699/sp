@@ -1,0 +1,1 @@
+NVIDIA NIM provides optimized inference for AI models. It supports various model types including LLMs, embeddings, and multimodal models for enterprise deployments.

@@ -1,0 +1,1 @@
+Vector databases enable efficient similarity search for high-dimensional embeddings. They are essential for RAG systems to retrieve relevant context quickly.

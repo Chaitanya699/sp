@@ -1,0 +1,1 @@
+NIM Sentinel is an enterprise multi-agent RAG system with NVIDIA NIM integration. It provides document ingestion, hybrid retrieval, and query capabilities.

@@ -1,0 +1,1 @@
+Blockchain technology provides decentralized consensus without trusted intermediaries. Smart contracts enable programmable transactions on distributed ledgers.

@@ -94,7 +94,8 @@ class Settings(BaseSettings):
     langsmith_endpoint: str = Field(default="https://api.smith.langchain.com", description="LangSmith endpoint")
 
     # MongoDB
-    mongodb_uri: str = Field(default="mongodb://localhost:27017", description="MongoDB connection URI")
+    mongo_target: str = Field(default="atlas", description="MongoDB target: 'local' or 'atlas'")
+    mongodb_uri: str = Field(default="mongodb://localhost:27017", description="MongoDB Atlas connection URI")
     mongodb_local_uri: str = Field(default="mongodb://localhost:27017", description="MongoDB local connection URI")
     mongodb_database: str = Field(default="nim_sentinel", description="MongoDB database name")
     mongodb_max_pool_size: int = Field(default=100, description="MongoDB max pool size")
@@ -103,6 +104,13 @@ class Settings(BaseSettings):
     mongodb_server_selection_timeout_ms: int = Field(default=5000, description="MongoDB server selection timeout ms")
     mongodb_connect_timeout_ms: int = Field(default=10000, description="MongoDB connect timeout ms")
     mongodb_socket_timeout_ms: int = Field(default=20000, description="MongoDB socket timeout ms")
+
+    @property
+    def effective_mongodb_uri(self) -> str:
+        """Get the effective MongoDB URI based on mongo_target."""
+        if self.mongo_target == "local":
+            return self.mongodb_local_uri
+        return self.mongodb_uri
 
     # Redis
     redis_url: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")

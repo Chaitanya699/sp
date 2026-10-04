@@ -1,0 +1,1 @@
+Quantum computing uses quantum bits or qubits that can exist in superposition states. This enables parallel computation for certain algorithms.

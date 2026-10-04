@@ -1,0 +1,1 @@
+NVIDIA NIM provides optimized inference microservices for deploying AI models at scale. The platform supports various model architectures including LLMs, embedding models, and multimodal models.

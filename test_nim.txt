@@ -1,0 +1,10 @@
+NVIDIA NIM (NVIDIA Inference Microservices) is a set of easy-to-use microservices designed to accelerate the deployment of generative AI models across the cloud, data center, and workstations. NIM provides pre-built containers optimized for NVIDIA GPUs, enabling developers to quickly deploy AI models with minimal configuration.
+
+Key features of NVIDIA NIM:
+1. Pre-optimized containers for popular AI models
+2. Standardized APIs for easy integration
+3. Support for NVIDIA GPUs across cloud and on-premises
+4. Enterprise-grade security and support
+5. Integration with Kubernetes and container orchestration
+
+NIM supports various model types including LLMs, embedding models, and multimodal models. The microservices architecture allows for scalable deployment and easy updates.

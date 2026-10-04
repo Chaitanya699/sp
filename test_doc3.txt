@@ -1,0 +1,1 @@
+Machine learning models require large amounts of training data to achieve high accuracy. The quality and diversity of the training data directly impacts model performance.

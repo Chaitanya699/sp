@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Create MongoDB Atlas Vector Search and Full-Text Search indexes.
+Validate MongoDB Atlas Vector Search and Full-Text Search indexes.
 
 Validates embedding dimension from models.yaml matches index definition.
 Fail-fast on dimension mismatch.
+For Atlas: checks index status via listSearchIndexes (does NOT create).
+For local MongoDB: provides manual creation instructions.
 """
 
 import json
@@ -81,8 +83,57 @@ def validate_dimension(index_def: dict, expected_dim: int) -> None:
     print(f"[OK] Dimension validated: {actual_dim} dimensions")
 
 
-async def create_indexes() -> None:
-    """Create MongoDB Atlas Search indexes."""
+def is_atlas_deployment(client: MongoClient) -> bool:
+    """Check if connected to MongoDB Atlas."""
+    try:
+        # Atlas clusters have a specific server version format
+        server_info = client.server_info()
+        version = server_info.get("version", "")
+        # Atlas versions often contain "atlas" or specific patterns
+        # Also check for Atlas-specific commands
+        return "atlas" in version.lower()
+    except Exception:
+        return False
+
+
+def print_manual_instructions(index_defs: dict) -> None:
+    """Print manual index creation instructions for Atlas UI."""
+    print("\n" + "=" * 60)
+    print("MANUAL INDEX CREATION REQUIRED (Atlas UI)")
+    print("=" * 60)
+    print("Local MongoDB does not support Atlas Search indexes.")
+    print("Create these indexes in MongoDB Atlas UI:")
+    print("  1. Go to your Atlas cluster -> Search tab -> Create Search Index")
+    print("  2. Select 'JSON Editor' and paste each definition below")
+    print("  3. Set database: nim_sentinel, collection: chunks")
+    print("=" * 60)
+    for idx in index_defs["indexes"]:
+        print(f"\n--- Index: {idx['name']} ({idx['type']}) ---")
+        print(json.dumps(idx["definition"], indent=2))
+    print("\n" + "=" * 60)
+
+
+def check_index_status(db, index_name: str) -> dict | None:
+    """Check status of a search index using listSearchIndexes."""
+    try:
+        # Use listSearchIndexes command to get index status
+        result = db.command("listSearchIndexes", "chunks", name=index_name)
+        indexes = result.get("cursor", {}).get("firstBatch", [])
+        if indexes:
+            return indexes[0]
+        return None
+    except OperationFailure as e:
+        if "not found" in str(e).lower() or "does not exist" in str(e).lower():
+            return None
+        raise
+
+
+async def validate_indexes() -> int:
+    """Validate MongoDB Atlas Search indexes exist and are READY.
+
+    Returns:
+        0 on success (all indexes exist and READY), 1 on failure
+    """
     settings = get_settings()
 
     # Load configurations
@@ -98,65 +149,69 @@ async def create_indexes() -> None:
             validate_dimension(idx, expected_dim)
 
     # Connect to MongoDB
-    uri = settings.mongodb_uri or settings.mongodb_local_uri
+    uri = settings.effective_mongodb_uri
     if not uri:
         raise ValueError("No MongoDB URI configured")
 
     client = MongoClient(uri)
     db = client[settings.mongodb_database]
-    collection = db["chunks"]
 
-    # Create indexes
+    # Check if we're on Atlas
+    on_atlas = is_atlas_deployment(client)
+    print(f"Connected to: {'Atlas' if on_atlas else 'Local MongoDB'}")
+
+    if not on_atlas:
+        print("[WARN] Local MongoDB detected - Atlas Search indexes not supported")
+        print_manual_instructions(index_defs)
+        client.close()
+        return 1  # Non-zero exit: indexes not available on local
+
+    # On Atlas - check index status
+    all_ready = True
     for idx in index_defs["indexes"]:
         name = idx["name"]
         idx_type = idx["type"]
-        definition = idx["definition"]
 
-        print(f"Creating {idx_type} index: {name}...")
+        print(f"Checking {idx_type} index: {name}...")
 
-        try:
-            if idx_type == "vectorSearch":
-                # Vector Search index creation via Atlas Admin API
-                # Note: This requires Atlas Admin API or manual creation in Atlas UI
-                # For programmatic creation, we use the createSearchIndex command
-                await db.command(
-                    "createSearchIndex",
-                    "chunks",
-                    name=name,
-                    type=idx_type,
-                    definition=definition,
-                )
-            elif idx_type == "search":
-                await db.command(
-                    "createSearchIndex",
-                    "chunks",
-                    name=name,
-                    type=idx_type,
-                    definition=definition,
-                )
-            print(f"[OK] Index '{name}' created successfully")
-        except OperationFailure as e:
-            if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
-                print(f"[OK] Index '{name}' already exists")
-            else:
-                print(f"[FAIL] Failed to create index '{name}': {e}")
-                raise
-        except Exception as e:
-            # Some MongoDB deployments don't support createSearchIndex command
-            # Fall back to manual instruction
-            print(f"[WARN] Could not create index programmatically: {e}")
-            print(f"  Please create index '{name}' manually in Atlas UI:")
-            print(f"  {json.dumps(definition, indent=2)}")
+        index_info = check_index_status(db, name)
+        if index_info is None:
+            print(f"[FAIL] Index '{name}' does not exist")
+            all_ready = False
+            continue
+
+        status = index_info.get("status", "UNKNOWN")
+        queryable = index_info.get("queryable", False)
+
+        if status == "READY" and queryable:
+            print(f"[OK] Index '{name}' is READY and queryable")
+        elif status == "BUILDING":
+            print(f"[WARN] Index '{name}' is BUILDING (not yet queryable)")
+            all_ready = False
+        elif status == "FAILED":
+            print(f"[FAIL] Index '{name}' build FAILED")
+            all_ready = False
+        else:
+            print(f"[WARN] Index '{name}' status: {status}, queryable: {queryable}")
+            if not queryable:
+                all_ready = False
 
     client.close()
-    print("[OK] All indexes processed")
+
+    if all_ready:
+        print("[OK] All indexes are READY and queryable")
+        return 0
+    else:
+        print("[FAIL] Some indexes are not READY")
+        return 1
 
 
 if __name__ == "__main__":
     import asyncio
 
     try:
-        asyncio.run(create_indexes())
+        exit_code = asyncio.run(validate_indexes())
+        sys.exit(exit_code)
     except Exception as e:
         print(f"[FAIL] Error: {e}", file=sys.stderr)
         sys.exit(1)

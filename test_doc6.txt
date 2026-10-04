@@ -1,0 +1,1 @@
+RAG systems combine retrieval and generation to provide accurate answers. The retriever finds relevant documents and the generator creates responses based on retrieved context.

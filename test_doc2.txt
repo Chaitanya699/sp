@@ -1,0 +1,1 @@
+The NIM Sentinel system uses MongoDB for document storage and vector search. It implements hybrid retrieval combining vector similarity and full-text search with RRF fusion.
