@@ -305,6 +305,13 @@ async def list_documents(
         limit=limit,
     )
 
+    # Convert ObjectIds to strings for serialization
+    for doc in documents:
+        if "_id" in doc:
+            doc["_id"] = str(doc["_id"])
+        if "document_id" in doc:
+            doc["document_id"] = str(doc["document_id"])
+
     total = await doc_repo.count({})
     if status_filter:
         total = await doc_repo.count({"status": status_filter})
@@ -335,6 +342,12 @@ async def get_document(
     document = await doc_repo.get_document(document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    # Convert ObjectId to string for serialization
+    if "_id" in document:
+        document["_id"] = str(document["_id"])
+    if "document_id" in document:
+        document["document_id"] = str(document["document_id"])
 
     return document
 

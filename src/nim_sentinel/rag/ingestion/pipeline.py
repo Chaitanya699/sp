@@ -133,22 +133,6 @@ class IngestionPipeline:
             if content_size_mb > self.config.max_file_size_mb:
                 raise DocumentTooLargeError(content_size_mb, self.config.max_file_size_mb)
 
-            # Compute content hash for deduplication
-            content_hash = hashlib.sha256(content).hexdigest()
-
-            # Check for duplicate
-            if self.config.skip_duplicates:
-                doc_repo = await self._get_document_repo()
-                existing = await doc_repo.get_by_content_hash(content_hash)
-                if existing:
-                    logger.info("Skipping duplicate: %s", filename)
-                    return IngestionResult(
-                        document_id=str(existing["_id"]),
-                        filename=filename,
-                        status="skipped",
-                        metadata={"duplicate_of": str(existing["_id"])},
-                    )
-
             # Parse document
             parse_metadata = {"parser": "bytes", "source_type": source_type}
 

@@ -2,9 +2,10 @@
 Tests for NIM Sentinel Hybrid Retriever
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 
 import pytest
+from langchain_core.documents import Document
 from nim_sentinel.rag.retriever import HybridRetriever, RetrievalResult
 
 
@@ -69,7 +70,7 @@ class TestHybridRetriever:
         with patch.object(retriever, "_get_reranker") as mock_get_reranker:
             mock_reranker = AsyncMock()
             mock_reranker.acompress_documents.return_value = [
-                ("Vector result content", 0.9)
+                Document(page_content="Vector result content", metadata={"relevance_score": 0.9})
             ]
             mock_get_reranker.return_value = mock_reranker
 
@@ -102,7 +103,7 @@ class TestHybridRetriever:
         with patch.object(retriever, "_get_reranker") as mock_get_reranker:
             mock_reranker = AsyncMock()
             mock_reranker.acompress_documents.return_value = [
-                ("Text result content", 0.8)
+                Document(page_content="Text result content", metadata={"relevance_score": 0.8})
             ]
             mock_get_reranker.return_value = mock_reranker
 
@@ -158,9 +159,9 @@ class TestHybridRetriever:
         with patch.object(retriever, "_get_reranker") as mock_get_reranker:
             mock_reranker = AsyncMock()
             mock_reranker.acompress_documents.return_value = [
-                ("Shared content", 0.95),
-                ("Vector only content", 0.7),
-                ("Text only content", 0.6),
+                Document(page_content="Shared content", metadata={"relevance_score": 0.95}),
+                Document(page_content="Vector only content", metadata={"relevance_score": 0.7}),
+                Document(page_content="Text only content", metadata={"relevance_score": 0.6}),
             ]
             mock_get_reranker.return_value = mock_reranker
 

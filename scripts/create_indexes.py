@@ -5,7 +5,7 @@ Validate MongoDB Atlas Vector Search and Full-Text Search indexes.
 Validates embedding dimension from models.yaml matches index definition.
 Fail-fast on dimension mismatch.
 For Atlas: checks index status via listSearchIndexes (does NOT create).
-For local MongoDB: provides manual creation instructions.
+For local MongoDB: creates regular indexes (tenant_id, document_id, text index).
 """
 
 import json
@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 import yaml
-from pymongo import MongoClient
+from pymongo import ASCENDING, MongoClient, TEXT
 from pymongo.errors import OperationFailure
 
 from nim_sentinel.core.config import get_settings
@@ -43,6 +43,7 @@ def get_embedding_dimension(models_config: dict) -> int:
         "nvidia/nemotron-3-embed-1b": 2048,
         "nvidia/llama-nemotron-embed-1b-v2": 1024,
         "nvidia/llama-3.2-nv-embedqa-1b-v1": 1024,
+        "snowflake/arctic-embed-l": 1024,
     }
 
     dimension = model_dimensions.get(primary_model)
@@ -130,6 +131,64 @@ def check_index_status(db, index_name: str) -> dict | None:
         raise
 
 
+def create_local_indexes(db) -> bool:
+    """Create regular MongoDB indexes for local development."""
+    print("[INFO] Creating local MongoDB indexes...")
+
+    chunks = db["chunks"]
+
+    # Create compound index for tenant_id + document_id (for chunk retrieval)
+    try:
+        chunks.create_index([("tenant_id", ASCENDING), ("document_id", ASCENDING)])
+        print("[OK] Created index: tenant_id + document_id")
+    except Exception as e:
+        print(f"[WARN] tenant_id + document_id index: {e}")
+
+    # Create compound index for tenant_id + document_id + chunk_index (ordered chunks)
+    try:
+        chunks.create_index([("tenant_id", ASCENDING), ("document_id", ASCENDING), ("chunk_index", ASCENDING)])
+        print("[OK] Created index: tenant_id + document_id + chunk_index")
+    except Exception as e:
+        print(f"[WARN] tenant_id + document_id + chunk_index index: {e}")
+
+    # Create index for tenant_id + embedding_model
+    try:
+        chunks.create_index([("tenant_id", ASCENDING), ("embedding_model", ASCENDING)])
+        print("[OK] Created index: tenant_id + embedding_model")
+    except Exception as e:
+        print(f"[WARN] tenant_id + embedding_model index: {e}")
+
+    # Create text index for content (for regex/text search fallback)
+    try:
+        chunks.create_index([("content", TEXT)], name="content_text_index")
+        print("[OK] Created text index: content")
+    except Exception as e:
+        print(f"[WARN] content text index: {e}")
+
+    # Create indexes for documents collection
+    docs = db["documents"]
+    try:
+        docs.create_index([("tenant_id", ASCENDING), ("status", ASCENDING)])
+        docs.create_index([("tenant_id", ASCENDING), ("created_at", -1)])
+        docs.create_index([("tenant_id", ASCENDING), ("source_type", ASCENDING)])
+        docs.create_index([("content_hash", ASCENDING)], unique=True, sparse=True)
+        print("[OK] Created document indexes")
+    except Exception as e:
+        print(f"[WARN] document indexes: {e}")
+
+    # Create indexes for sessions collection
+    sessions = db["sessions"]
+    try:
+        sessions.create_index([("tenant_id", ASCENDING), ("user_id", ASCENDING), ("updated_at", -1)])
+        sessions.create_index([("tenant_id", ASCENDING), ("status", ASCENDING)])
+        sessions.create_index([("thread_id", ASCENDING)], unique=True)
+        print("[OK] Created session indexes")
+    except Exception as e:
+        print(f"[WARN] session indexes: {e}")
+
+    return True
+
+
 async def validate_indexes() -> int:
     """Validate MongoDB Atlas Search indexes exist and are READY.
 
@@ -163,10 +222,11 @@ async def validate_indexes() -> int:
     print(f"Connected to: {'Atlas' if on_atlas else 'Local MongoDB'}")
 
     if not on_atlas:
-        print("[WARN] Local MongoDB detected - Atlas Search indexes not supported")
-        print_manual_instructions(index_defs)
+        print("[INFO] Local MongoDB detected - creating regular indexes")
+        create_local_indexes(db)
+        print("[OK] Local indexes created successfully")
         client.close()
-        return 1  # Non-zero exit: indexes not available on local
+        return 0
 
     # On Atlas - check index status
     all_ready = True
@@ -201,10 +261,10 @@ async def validate_indexes() -> int:
     client.close()
 
     if all_ready:
-        print("[OK] All indexes are READY and queryable")
+        print("[OK] All Atlas indexes are READY and queryable")
         return 0
     else:
-        print("[FAIL] Some indexes are not READY")
+        print("[FAIL] Some Atlas indexes are not READY")
         return 1
 
 

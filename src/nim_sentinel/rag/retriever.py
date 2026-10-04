@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+from langchain_core.documents import Document
 from langchain_nvidia_ai_endpoints import NVIDIARerank
 from nim_sentinel.core.config import get_model_config, get_settings
 from nim_sentinel.core.errors import ModelError
@@ -223,8 +224,8 @@ class HybridRetriever:
         try:
             reranker = await self._get_reranker()
 
-            # Prepare documents for reranking
-            documents = [c["content"] for c in candidates]
+            # Prepare documents for reranking (convert to LangChain Documents)
+            documents = [Document(page_content=c["content"], metadata=c) for c in candidates]
 
             # Rerank
             rerank_results = await reranker.acompress_documents(
@@ -233,17 +234,17 @@ class HybridRetriever:
             )
 
             # Map reranked results back to candidates
-            # rerank_results contains (doc, score) tuples
+            # rerank_results contains Document objects with relevance_score in metadata
             reranked = []
-            for _, (doc, score) in enumerate(rerank_results):
-                # Find original candidate
+            for doc in rerank_results:
+                # Find original candidate by content
                 orig_idx = next(
-                    (j for j, c in enumerate(candidates) if c["content"] == doc),
+                    (j for j, c in enumerate(candidates) if c["content"] == doc.page_content),
                     None,
                 )
                 if orig_idx is not None:
                     candidate = candidates[orig_idx].copy()
-                    candidate["rerank_score"] = score
+                    candidate["rerank_score"] = doc.metadata.get("relevance_score", 0.0)
                     candidate["_source"] = "reranked"
                     reranked.append(candidate)
 
