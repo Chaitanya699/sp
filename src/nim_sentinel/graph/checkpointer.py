@@ -5,7 +5,7 @@ LangGraph checkpointer implementation using MongoDB for persistence.
 """
 
 import logging
-from typing import Any, Optional, AsyncIterator
+from typing import Any, Optional, AsyncIterator, Sequence
 from datetime import datetime
 from contextlib import asynccontextmanager
 
@@ -34,46 +34,77 @@ class MongoDBCheckpointer(BaseCheckpointSaver[int]):
     Stores checkpoints in a MongoDB collection with tenant isolation.
     """
 
-    def __init__(self, tenant_id: str) -> None:
+    def __init__(
+        self,
+        tenant_id: str,
+        db: AsyncDatabase[Any] | None = None,
+        collection: AsyncCollection[Any] | None = None,
+    ) -> None:
         super().__init__()
         self.tenant_id = tenant_id
-        self._db: AsyncDatabase[Any] | None = None
-        self._collection: AsyncCollection[Any] | None = None
+        self._db = db
+        self._collection = collection
+        self._indexes_created = False
 
     async def _get_collection(self) -> AsyncCollection[Any]:
         """Get or create the checkpoints collection."""
         if self._collection is not None:
             return self._collection
 
-        self._db = await get_database()
+        if self._db is None:
+            self._db = await get_database()
         self._collection = self._db["langgraph_checkpoints"]
 
-        # Create indexes
-        await self._collection.create_index([
-            ("tenant_id", ASCENDING),
-            ("thread_id", ASCENDING),
-            ("checkpoint_ns", ASCENDING),
-            ("checkpoint_id", ASCENDING),
-        ], unique=True)
+        # Create indexes (only once per instance)
+        if not self._indexes_created:
+            await self._collection.create_index([
+                ("tenant_id", ASCENDING),
+                ("thread_id", ASCENDING),
+                ("checkpoint_ns", ASCENDING),
+                ("checkpoint_id", ASCENDING),
+            ], unique=True)
 
-        await self._collection.create_index([
-            ("tenant_id", ASCENDING),
-            ("thread_id", ASCENDING),
-            ("updated_at", -1),
-        ])
+            await self._collection.create_index([
+                ("tenant_id", ASCENDING),
+                ("thread_id", ASCENDING),
+                ("updated_at", -1),
+            ])
+            self._indexes_created = True
 
         return self._collection
 
     def _serialize_checkpoint(self, checkpoint: Checkpoint, config: RunnableConfig) -> dict[str, Any]:
         """Serialize checkpoint to MongoDB document."""
         configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
+
+        def serialize_value(value: Any) -> Any:
+            """Recursively serialize values to MongoDB-compatible types."""
+            if hasattr(value, '__dataclass_fields__'):
+                # It's a dataclass, convert to dict
+                return {k: serialize_value(v) for k, v in value.__dict__.items()}
+            elif isinstance(value, list):
+                return [serialize_value(v) for v in value]
+            elif isinstance(value, dict):
+                return {k: serialize_value(v) for k, v in value.items()}
+            elif hasattr(value, '__dict__'):
+                # Generic object with __dict__
+                return serialize_value(value.__dict__)
+            else:
+                return value
+
+        # Convert channel_values to dict if it contains dataclass objects
+        channel_values = checkpoint.get("channel_values", {})
+        serialized_values = {}
+        for key, value in channel_values.items():
+            serialized_values[key] = serialize_value(value)
+
         return {
             "tenant_id": self.tenant_id,
             "thread_id": configurable.get("thread_id", ""),
             "checkpoint_ns": configurable.get("checkpoint_ns", ""),
             "checkpoint_id": checkpoint.get("id", ""),
             "parent_checkpoint_id": config.get("configurable", {}).get("checkpoint_id"),
-            "checkpoint": checkpoint.get("channel_values", {}),
+            "checkpoint": serialized_values,
             "metadata": config.get("metadata", {}),
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),
@@ -125,19 +156,17 @@ class MongoDBCheckpointer(BaseCheckpointSaver[int]):
         doc = self._serialize_checkpoint(checkpoint, config)
         doc["metadata"] = metadata
 
-        try:
-            await collection.insert_one(doc)
-        except DuplicateKeyError:
-            # Update existing
-            await collection.update_one(
-                {
-                    "tenant_id": self.tenant_id,
-                    "thread_id": doc["thread_id"],
-                    "checkpoint_ns": doc["checkpoint_ns"],
-                    "checkpoint_id": doc["checkpoint_id"],
-                },
-                {"$set": doc},
-            )
+        # Use upsert to handle both insert and update atomically
+        await collection.update_one(
+            {
+                "tenant_id": self.tenant_id,
+                "thread_id": doc["thread_id"],
+                "checkpoint_ns": doc["checkpoint_ns"],
+                "checkpoint_id": doc["checkpoint_id"],
+            },
+            {"$set": doc},
+            upsert=True,
+        )
 
         return {"configurable": {"thread_id": doc["thread_id"], "checkpoint_ns": doc["checkpoint_ns"]}}
 
@@ -215,6 +244,18 @@ class MongoDBCheckpointer(BaseCheckpointSaver[int]):
             "tenant_id": self.tenant_id,
             "thread_id": thread_id,
         })
+
+    async def aput_writes(
+        self,
+        config: RunnableConfig,
+        writes: Sequence[tuple[str, Any]],
+        task_id: str,
+        task_path: str = "",
+    ) -> None:
+        """Store writes (required by LangGraph)."""
+        # For now, we don't need to store intermediate writes separately
+        # The main checkpoint is stored via aput
+        pass
 
 
 @asynccontextmanager
