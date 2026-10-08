@@ -10,6 +10,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from nim_sentinel.core.config import get_model_config, get_settings
 from nim_sentinel.graph.state import AgentState, CriticOutput
+from nim_sentinel.llm.model_registry import get_model_registry
 
 logger = logging.getLogger(__name__)
 
@@ -95,29 +96,43 @@ Generated Answer:
 
 Review this answer and provide your evaluation."""
 
-        messages = [
-            SystemMessage(content=self.system_prompt),
-            HumanMessage(content=user_prompt),
-        ]
-
         try:
-            response = await self.llm.ainvoke(messages)
+            registry = get_model_registry()
 
-            # Parse JSON response
-            import json
-            # Handle response.content which can be str or list
-            content = response.content
-            if isinstance(content, list):
-                content = " ".join(str(c) for c in content)
-            try:
-                result_dict: dict[str, Any] = json.loads(content)
-            except json.JSONDecodeError:
-                # Try to extract JSON from markdown code block
-                if "```json" in content:
-                    content = content.split("```json")[1].split("```")[0]
-                elif "```" in content:
-                    content = content.split("```")[1].split("```")[0]
-                result_dict = json.loads(content.strip())
+            async def _review(model: ChatNVIDIA) -> dict[str, Any]:
+                messages = [
+                    SystemMessage(content=self.system_prompt),
+                    HumanMessage(content=user_prompt),
+                ]
+                response = await model.ainvoke(messages)
+                content = response.content
+                if isinstance(content, list):
+                    content = " ".join(str(c) for c in content)
+                import json
+                try:
+                    result_dict: dict[str, Any] = json.loads(content)
+                except json.JSONDecodeError:
+                    # Try to extract JSON from markdown code block
+                    if "```json" in content:
+                        content = content.split("```json")[1].split("```")[0]
+                    elif "```" in content:
+                        content = content.split("```")[1].split("```")[0]
+                    result_dict = json.loads(content.strip())
+                return result_dict
+
+            result = await registry.call_with_retry_and_fallback(
+                role="judge_llm",
+                model_type="chat",
+                func=_review,
+            )
+
+            fallback_used = False
+            result_dict: dict[str, Any] = {}
+            if isinstance(result, dict):
+                fallback_used = result.get("llm_fallback_used", False)
+                result_dict = {k: v for k, v in result.items() if k != "llm_fallback_used"}
+
+            state.metadata["critic_fallback_used"] = fallback_used
 
             return CriticOutput(
                 approved=result_dict.get("approved", False),
@@ -155,7 +170,9 @@ async def critic_node(state: AgentState) -> AgentState:
         state.needs_critique = False
         logger.info("Critic: Answer approved (confidence: %.2f)", output.confidence)
     else:
-        state.retry_count += 1
+        # Cap retry_count at 3 (max retries)
+        if state.retry_count < 3:
+            state.retry_count += 1
         state.needs_critique = True
         logger.info("Critic: Answer rejected, retry %d: %s", state.retry_count, output.feedback)
 

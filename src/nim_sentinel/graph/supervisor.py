@@ -4,12 +4,14 @@ NIM Sentinel Supervisor Node
 Routes queries to appropriate subgraphs based on query analysis.
 """
 
+import json
 import logging
-from typing import Literal
+from typing import Any, Literal
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from nim_sentinel.core.config import get_model_config, get_settings
 from nim_sentinel.graph.state import AgentState, SupervisorDecision, create_initial_state
+from nim_sentinel.llm.model_registry import get_model_registry
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +74,8 @@ Respond with a JSON object:
             )
 
         # If critic already reviewed and approved, end
-        if state.critique_feedback and "approved" in state.critique_feedback.lower():
+        critic_output = state.metadata.get("critic_output", {})
+        if critic_output.get("approved", False):
             return SupervisorDecision(
                 next_node="end",
                 reasoning="Critic approved the answer",
@@ -81,7 +84,8 @@ Respond with a JSON object:
 
         # For simple greetings, end directly
         query_lower = state.query.lower().strip()
-        if query_lower in ("hello", "hi", "hey", "thanks", "thank you", "bye", "goodbye"):
+        greeting_keywords = ("hello", "hi", "hey", "thanks", "thank you", "bye", "goodbye")
+        if query_lower in greeting_keywords or any(query_lower.startswith(g + " ") for g in greeting_keywords):
             return SupervisorDecision(
                 next_node="end",
                 reasoning="Simple greeting, no RAG needed",
@@ -94,6 +98,54 @@ Respond with a JSON object:
             reasoning="Query requires RAG retrieval and generation",
             confidence=0.9,
         )
+
+    async def decide_with_llm(self, state: AgentState) -> SupervisorDecision:
+        """Analyze state using LLM and decide next node (for complex routing)."""
+        try:
+            registry = get_model_registry()
+
+            async def _decide(model: ChatNVIDIA) -> dict[str, Any]:
+                messages = [
+                    SystemMessage(content=self.system_prompt),
+                    HumanMessage(content=f"Query: {state.query}\n\nCurrent state: answer_exists={bool(state.answer)}, needs_critique={state.needs_critique}, retry_count={state.retry_count}"),
+                ]
+                response = await model.ainvoke(messages)
+                content = response.content
+                if isinstance(content, list):
+                    content = " ".join(str(c) for c in content)
+                import json
+                try:
+                    result: dict[str, Any] = json.loads(content)
+                except json.JSONDecodeError:
+                    if "```json" in content:
+                        content = content.split("```json")[1].split("```")[0]
+                    elif "```" in content:
+                        content = content.split("```")[1].split("```")[0]
+                    result = json.loads(content.strip())
+                return result
+
+            result = await registry.call_with_retry_and_fallback(
+                role="supervisor_llm",
+                model_type="chat",
+                func=_decide,
+            )
+
+            fallback_used = False
+            result_dict: dict[str, Any] = {}
+            if isinstance(result, dict):
+                fallback_used = result.get("llm_fallback_used", False)
+                # Remove the fallback indicator from the result
+                result_dict = {k: v for k, v in result.items() if k != "llm_fallback_used"}
+
+            return SupervisorDecision(
+                next_node=result_dict.get("next_node", "rag_subgraph"),
+                reasoning=result_dict.get("reasoning", "LLM routing decision"),
+                confidence=result_dict.get("confidence", 0.9),
+            )
+
+        except Exception as e:
+            logger.error("Supervisor LLM decision failed, using rule-based: %s", e)
+            return await self.decide(state)
 
 
 async def supervisor_node(state: AgentState) -> AgentState:

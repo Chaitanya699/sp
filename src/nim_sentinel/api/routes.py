@@ -4,10 +4,13 @@ NIM Sentinel API Routes
 FastAPI endpoints for document ingestion and RAG queries with JWT authentication.
 """
 
+import json
 import logging
-from typing import Any, Awaitable, Callable
+import time
+from typing import Any, Awaitable, Callable, AsyncGenerator
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from nim_sentinel.core.errors import (
     AuthenticationError,
@@ -30,12 +33,14 @@ from nim_sentinel.db.repositories import (
 )
 from nim_sentinel.rag.ingestion.pipeline import IngestionConfig, IngestionPipeline
 from nim_sentinel.rag.retriever import get_hybrid_retriever
-from nim_sentinel.graph.main_graph import run_graph
+from nim_sentinel.graph.main_graph import run_graph, get_graph_for_tenant
+from nim_sentinel.graph.checkpointer import create_checkpointer
+from nim_sentinel.llm.model_registry import FallbackExhaustedError, get_model_registry
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/v1", tags=["documents", "query"])
+router = APIRouter(prefix="/v1", tags=["documents", "query", "chat"])
 
 # Security
 security = HTTPBearer(auto_error=False)
@@ -501,6 +506,8 @@ class AgentQueryResponse(BaseModel):
     total_results: int
     latency_ms: float
     session_id: str
+    llm_fallback_used: bool = False
+    critic_fallback_used: bool = False
 
 
 @router.post(
@@ -590,14 +597,301 @@ async def agent_query(
             total_results=len(final_state.retrieval_results),
             latency_ms=latency_ms,
             session_id=request.session_id,
+            llm_fallback_used=final_state.metadata.get("llm_fallback_used", False),
+            critic_fallback_used=final_state.metadata.get("critic_fallback_used", False),
         )
 
+    except FallbackExhaustedError as e:
+        logger.error(
+            "Agent query failed - all LLM models exhausted",
+            extra={"correlation_id": correlation_id, "error": str(e), "models": e.models},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "All LLM models unavailable",
+                "message": "Both primary and fallback models failed after retries",
+                "models_tried": e.models,
+            },
+        ) from e
     except Exception as e:
         logger.error(
             "Agent query failed",
             extra={"correlation_id": correlation_id, "error": str(e)},
         )
         raise HTTPException(status_code=500, detail=f"Agent query failed: {str(e)}") from e
+
+
+class ChatRequest(BaseModel):
+    """Request model for /v1/chat endpoint."""
+
+    query: str = Field(..., min_length=1, max_length=10000, description="Query text")
+    session_id: str = Field(..., min_length=1, max_length=100, description="Session ID for conversation continuity")
+    top_k: int = Field(default=10, ge=1, le=50, description="Number of results to return")
+    filter: dict[str, Any] | None = Field(default=None, description="Optional metadata filters")
+    include_citations: bool = Field(default=True, description="Include citations in response")
+
+
+class ChatResponse(BaseModel):
+    """Response model for /v1/chat endpoint."""
+
+    query: str
+    answer: str
+    confidence: float
+    citations: list[dict[str, Any]] | None = None
+    retrieval_results: list[dict[str, Any]] | None = None
+    total_results: int
+    latency_ms: float
+    session_id: str
+    llm_fallback_used: bool = False
+    critic_fallback_used: bool = False
+
+
+@router.post(
+    "/chat",
+    response_model=ChatResponse,
+    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def chat(
+    request: ChatRequest,
+    user: TokenData = Depends(require_permission("chat")),
+    tenant_id: str = Depends(get_tenant_id),
+) -> ChatResponse:
+    """
+    Chat with the agent using the full LangGraph pipeline (supervisor -> RAG -> critic).
+
+    This endpoint uses the multi-agent graph with:
+    - Supervisor for routing
+    - RAG subgraph for retrieval and generation
+    - Critic for answer quality review
+    - MongoDB checkpointer for conversation persistence
+    """
+    import time
+
+    start_time = time.perf_counter()
+    correlation_id = generate_correlation_id()
+
+    # Sanitize query
+    query = sanitize_input(request.query, max_length=10000)
+
+    logger.info(
+        "Chat request received",
+        extra={
+            "correlation_id": correlation_id,
+            "query": query[:100],
+            "user": user.username,
+            "session_id": request.session_id,
+            "top_k": request.top_k,
+        },
+    )
+
+    try:
+        # Run the agent graph with MongoDB checkpointer
+        checkpointer = create_checkpointer(tenant_id)
+        final_state = await run_graph(
+            query=query,
+            tenant_id=tenant_id,
+            user_id=user.sub,
+            session_id=request.session_id,
+            checkpointer=checkpointer,
+        )
+
+        # Prepare response
+        retrieval_results = []
+        for i, result in enumerate(final_state.retrieval_results):
+            retrieval_results.append(
+                {
+                    "rank": i + 1,
+                    "content": result.content,
+                    "document_id": result.document_id,
+                    "chunk_index": result.chunk_index,
+                    "score": result.score,
+                    "metadata": result.metadata,
+                    "source": result.source,
+                }
+            )
+
+        citations = final_state.citations if request.include_citations else None
+
+        latency_ms = (time.perf_counter() - start_time) * 1000
+
+        logger.info(
+            "Chat completed",
+            extra={
+                "correlation_id": correlation_id,
+                "answer_length": len(final_state.answer),
+                "confidence": final_state.confidence,
+                "results_count": len(final_state.retrieval_results),
+                "latency_ms": latency_ms,
+            },
+        )
+
+        return ChatResponse(
+            query=query,
+            answer=final_state.answer,
+            confidence=final_state.confidence,
+            citations=citations,
+            retrieval_results=retrieval_results,
+            total_results=len(final_state.retrieval_results),
+            latency_ms=latency_ms,
+            session_id=request.session_id,
+            llm_fallback_used=final_state.metadata.get("llm_fallback_used", False),
+            critic_fallback_used=final_state.metadata.get("critic_fallback_used", False),
+        )
+
+    except FallbackExhaustedError as e:
+        logger.error(
+            "Chat failed - all LLM models exhausted",
+            extra={"correlation_id": correlation_id, "error": str(e), "models": e.models},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "All LLM models unavailable",
+                "message": "Both primary and fallback models failed after retries",
+                "models_tried": e.models,
+            },
+        ) from e
+    except Exception as e:
+        logger.error(
+            "Chat failed",
+            extra={"correlation_id": correlation_id, "error": str(e)},
+        )
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}") from e
+
+
+@router.post(
+    "/chat/stream",
+    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def chat_stream(
+    request: ChatRequest,
+    user: TokenData = Depends(require_permission("chat")),
+    tenant_id: str = Depends(get_tenant_id),
+) -> StreamingResponse:
+    """
+    Stream chat response using Server-Sent Events (SSE).
+
+    Returns a stream of events:
+    - event: "start" - Initial event with session info
+    - event: "retrieval" - Retrieval results
+    - event: "generation" - Generated answer chunks
+    - event: "critique" - Critic feedback
+    - event: "end" - Final event with complete answer
+    - event: "error" - Error event
+    """
+    import json
+    import time
+
+    correlation_id = generate_correlation_id()
+
+    # Sanitize query
+    query = sanitize_input(request.query, max_length=10000)
+
+    logger.info(
+        "Chat stream request received",
+        extra={
+            "correlation_id": correlation_id,
+            "query": query[:100],
+            "user": user.username,
+            "session_id": request.session_id,
+        },
+    )
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        """Generate SSE events."""
+        try:
+            # Send start event
+            yield f"event: start\ndata: {json.dumps({'session_id': request.session_id, 'query': query})}\n\n"
+
+            # Create graph with checkpointer
+            checkpointer = create_checkpointer(tenant_id)
+            graph = get_graph_for_tenant(tenant_id)
+
+            # Config for checkpointer
+            from langchain_core.runnables import RunnableConfig
+            config: RunnableConfig = {
+                "configurable": {
+                    "thread_id": request.session_id,
+                    "checkpoint_ns": tenant_id,
+                }
+            }
+
+            # Create initial state
+            from nim_sentinel.graph.state import create_initial_state
+            initial_state = create_initial_state(
+                query=query,
+                tenant_id=tenant_id,
+                user_id=user.sub,
+                session_id=request.session_id,
+            )
+
+            # Stream graph execution
+            async for event in graph.astream(initial_state, config=config, stream_mode="updates"):
+                for node_name, node_output in event.items():
+                    if node_name == "supervisor":
+                        decision = node_output.get("metadata", {}).get("supervisor_decision", {})
+                        yield f"event: supervisor\ndata: {json.dumps({'next_node': decision.get('next_node'), 'reasoning': decision.get('reasoning')})}\n\n"
+                    elif node_name == "rag_subgraph":
+                        # Check if retrieval happened
+                        if "retrieval_results" in node_output:
+                            results = node_output["retrieval_results"]
+                            retrieval_data = [
+                                {
+                                    "rank": i + 1,
+                                    "content": r.content if hasattr(r, 'content') else r.get("content", ""),
+                                    "document_id": r.document_id if hasattr(r, 'document_id') else r.get("document_id", ""),
+                                    "chunk_index": r.chunk_index if hasattr(r, 'chunk_index') else r.get("chunk_index", 0),
+                                    "score": r.score if hasattr(r, 'score') else r.get("score", 0.0),
+                                }
+                                for i, r in enumerate(results)
+                            ]
+                            yield f"event: retrieval\ndata: {json.dumps({'results': retrieval_data})}\n\n"
+                        # Check if generation happened
+                        if "answer" in node_output:
+                            yield f"event: generation\ndata: {json.dumps({'answer_chunk': node_output['answer'], 'confidence': node_output.get('confidence', 0.0)})}\n\n"
+                    elif node_name == "critic":
+                        critique = node_output.get("metadata", {}).get("critic_output", {})
+                        yield f"event: critique\ndata: {json.dumps({'approved': critique.get('approved', False), 'feedback': critique.get('feedback', ''), 'confidence': critique.get('confidence', 0.0)})}\n\n"
+
+            # Get final state by running graph again (stream already executed it, this gets the final state)
+            final_state = await graph.ainvoke(initial_state, config=config)
+            if isinstance(final_state, dict):
+                from nim_sentinel.graph.state import AgentState
+                final_state = AgentState(**final_state)
+
+            # Send end event with complete answer
+            retrieval_results = []
+            for i, result in enumerate(final_state.retrieval_results):
+                retrieval_results.append(
+                    {
+                        "rank": i + 1,
+                        "content": result.content,
+                        "document_id": result.document_id,
+                        "chunk_index": result.chunk_index,
+                        "score": result.score,
+                        "metadata": result.metadata,
+                        "source": result.source,
+                    }
+                )
+
+            citations = final_state.citations if request.include_citations else None
+
+            yield f"event: end\ndata: {json.dumps({'answer': final_state.answer, 'confidence': final_state.confidence, 'citations': citations, 'retrieval_results': retrieval_results, 'total_results': len(final_state.retrieval_results)})}\n\n"
+
+        except Exception as e:
+            logger.error("Chat stream failed", extra={"correlation_id": correlation_id, "error": str(e)})
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/health")

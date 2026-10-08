@@ -64,50 +64,63 @@ async def generate_node(state: AgentState) -> AgentState:
         return state
 
     try:
-        settings = get_settings()
-        generator_config = get_model_config("generator_llm")
+        from nim_sentinel.llm.model_registry import get_model_registry
 
-        llm = ChatNVIDIA(
-            model=generator_config.primary,
-            api_key=settings.nvidia_api_key,
-            temperature=generator_config.temperature,
-            max_tokens=generator_config.max_tokens,
-            timeout=generator_config.timeout_seconds,
-        )
+        registry = get_model_registry()
 
-        # Build context from retrieval results
-        context_parts = []
-        for i, result in enumerate(state.retrieval_results):
-            context_parts.append(
-                f"[Source {i+1}] {result.content}"
-            )
-        context = "\n\n".join(context_parts)
+        async def _generate(model: ChatNVIDIA) -> str:
+            settings = get_settings()
+            generator_config = get_model_config("generator_llm")
 
-        # Build prompt
-        system_prompt = """You are NIM Sentinel, an enterprise RAG assistant.
+            # Build context from retrieval results
+            context_parts = []
+            for i, result in enumerate(state.retrieval_results):
+                context_parts.append(
+                    f"[Source {i+1}] {result.content}"
+                )
+            context = "\n\n".join(context_parts)
+
+            # Build prompt
+            system_prompt = """You are NIM Sentinel, an enterprise RAG assistant.
 Answer the user's question using ONLY the provided context.
 If the context doesn't contain enough information, say so.
 Always cite your sources using [Source N] format.
 Be concise and accurate."""
 
-        user_prompt = f"""Context:
+            user_prompt = f"""Context:
 {context}
 
 Question: {state.query}
 
 Answer:"""
 
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt),
-        ]
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+            ]
 
-        response = await llm.ainvoke(messages)
-        # Handle response.content which can be str or list
-        content = response.content
-        if isinstance(content, list):
-            content = " ".join(str(c) for c in content)
-        state.answer = content
+            response = await model.ainvoke(messages)
+            # Handle response.content which can be str or list
+            content = response.content
+            if isinstance(content, list):
+                content = " ".join(str(c) for c in content)
+            return content
+
+        # Use retry with fallback
+        answer = await registry.call_with_retry_and_fallback(
+            role="generator_llm",
+            model_type="chat",
+            func=_generate,
+        )
+
+        # Check if fallback was used
+        fallback_used = False
+        if isinstance(answer, dict):
+            fallback_used = answer.get("llm_fallback_used", False)
+            answer = answer.get("answer", str(answer))
+
+        state.answer = answer
+        state.metadata["llm_fallback_used"] = fallback_used
 
         # Calculate confidence based on retrieval scores
         if state.retrieval_results:
@@ -118,14 +131,12 @@ Answer:"""
 
         state.needs_critique = True
 
-        logger.info("RAG Subgraph: Generated answer (confidence: %.2f)", state.confidence)
+        logger.info("RAG Subgraph: Generated answer (confidence: %.2f, fallback: %s)", state.confidence, fallback_used)
 
     except Exception as e:
         logger.error("RAG Subgraph: Generation failed: %s", e)
-        state.answer = f"Error generating answer: {str(e)}"
-        state.confidence = 0.0
-        state.needs_critique = False
-        state.metadata["generation_error"] = str(e)
+        # Re-raise to let the API layer handle it with proper HTTP 503
+        raise
 
     state.updated_at = __import__("datetime").datetime.utcnow()
     return state

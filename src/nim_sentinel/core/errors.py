@@ -298,6 +298,12 @@ class FallbackExhaustedError(ModelError):
             details={**(details or {}), "tried_models": tried_models},
         )
 
+    @property
+    def models(self) -> list[str]:
+        """Get the list of models that were tried."""
+        tried = self.details.get("tried_models", [])
+        return tried if isinstance(tried, list) else []
+
 
 # Database Errors
 class DatabaseError(NIMException):

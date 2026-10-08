@@ -4,6 +4,9 @@ NIM Sentinel LLM Model Registry
 Manages model configurations, fallback chains, circuit breakers, and cost/latency tracking.
 """
 
+import asyncio
+import logging
+import random
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -28,6 +31,15 @@ from nim_sentinel.core.logging import get_logger
 logger = get_logger(__name__)
 
 T = TypeVar("T")
+
+# Retryable HTTP status codes
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+
+# Default retry configuration
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_BASE_DELAY = 1.0  # seconds
+DEFAULT_MAX_DELAY = 30.0  # seconds
+DEFAULT_JITTER_FACTOR = 0.1
 
 
 class CircuitState(StrEnum):
@@ -384,6 +396,160 @@ class ModelRegistry:
             breaker.reset()
         logger.info("All circuit breakers reset")
 
+    async def call_with_retry_and_fallback(
+        self,
+        role: ModelRole | str,
+        model_type: str = "chat",
+        func: Callable[..., Awaitable[Any]] | None = None,
+        max_retries: int | None = None,
+        base_delay: float = DEFAULT_BASE_DELAY,
+        max_delay: float = DEFAULT_MAX_DELAY,
+        jitter_factor: float = DEFAULT_JITTER_FACTOR,
+        **kwargs: Any,
+    ) -> Any:
+        """
+        Call a function with retry logic (exponential backoff + jitter) and fallback.
+
+        Args:
+            role: Model role to use
+            model_type: Type of model (chat, embedding, rerank)
+            func: Async function to call with the model. If None, returns the model instance.
+            max_retries: Maximum retries per model (default from config)
+            base_delay: Base delay for exponential backoff
+            max_delay: Maximum delay cap
+            jitter_factor: Jitter factor (0-1)
+            **kwargs: Additional arguments passed to func
+
+        Returns:
+            Result of func(model, **kwargs) or the model instance if func is None
+
+        Raises:
+            FallbackExhaustedError: If both primary and fallback fail after retries
+        """
+        role_str = role.value if isinstance(role, ModelRole) else role
+        config = get_model_config(role_str)
+
+        # Get max_retries from config if not provided
+        if max_retries is None:
+            max_retries = config.max_retries
+
+        fallback_used = False
+
+        # Try primary model with retries
+        for attempt in range(max_retries + 1):
+            try:
+                async with self.tracked_call(role_str, model_type, use_fallback=False) as model:
+                    if func is None:
+                        return model
+                    return await func(model, **kwargs)
+            except Exception as e:
+                error_str = str(e)
+                is_retryable = self._is_retryable_error(e)
+
+                if attempt < max_retries and is_retryable:
+                    # Calculate exponential backoff with jitter
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    jitter = delay * jitter_factor * random.random()
+                    total_delay = delay + jitter
+
+                    logger.warning(
+                        f"Model call failed (attempt {attempt + 1}/{max_retries + 1}), retrying in {total_delay:.2f}s",
+                        extra={
+                            "role": role_str,
+                            "model_type": model_type,
+                            "model": config.primary,
+                            "error": error_str,
+                            "attempt": attempt + 1,
+                            "max_retries": max_retries,
+                            "delay_seconds": total_delay,
+                        },
+                    )
+                    await asyncio.sleep(total_delay)
+                    continue
+
+                # Not retryable or max retries reached - try fallback
+                logger.warning(
+                    f"Primary model failed after {attempt + 1} attempts, trying fallback",
+                    extra={
+                        "role": role_str,
+                        "model_type": model_type,
+                        "model": config.primary,
+                        "error": error_str,
+                        "fallback": config.fallback,
+                    },
+                )
+                break
+
+        # Try fallback model with retries
+        if config.fallback:
+            fallback_used = True
+            for attempt in range(max_retries + 1):
+                try:
+                    async with self.tracked_call(role_str, model_type, use_fallback=True) as model:
+                        if func is None:
+                            return model
+                        result = await func(model, **kwargs)
+                        # Add fallback indicator to result if it's a dict
+                        if isinstance(result, dict):
+                            result["llm_fallback_used"] = True
+                        return result
+                except Exception as e:
+                    error_str = str(e)
+                    is_retryable = self._is_retryable_error(e)
+
+                    if attempt < max_retries and is_retryable:
+                        delay = min(base_delay * (2 ** attempt), max_delay)
+                        jitter = delay * jitter_factor * random.random()
+                        total_delay = delay + jitter
+
+                        logger.warning(
+                            f"Fallback model call failed (attempt {attempt + 1}/{max_retries + 1}), retrying in {total_delay:.2f}s",
+                            extra={
+                                "role": role_str,
+                                "model_type": model_type,
+                                "model": config.fallback,
+                                "error": error_str,
+                                "attempt": attempt + 1,
+                                "max_retries": max_retries,
+                                "delay_seconds": total_delay,
+                            },
+                        )
+                        await asyncio.sleep(total_delay)
+                        continue
+
+                    logger.error(
+                        f"Fallback model also failed after {attempt + 1} attempts",
+                        extra={
+                            "role": role_str,
+                            "model_type": model_type,
+                            "model": config.fallback,
+                            "error": error_str,
+                        },
+                    )
+                    break
+
+        # Both primary and fallback exhausted
+        raise FallbackExhaustedError(role_str, [config.primary, config.fallback] if config.fallback else [config.primary])
+
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """Check if an error is retryable (429, 500, 502, 503, 504, timeout)."""
+        error_str = str(error).lower()
+
+        # Check for timeout errors
+        if any(keyword in error_str for keyword in ["timeout", "timed out", "deadline exceeded"]):
+            return True
+
+        # Check for HTTP status codes in error message
+        for code in RETRYABLE_STATUS_CODES:
+            if str(code) in error_str:
+                return True
+
+        # Check for specific exception types
+        if isinstance(error, (asyncio.TimeoutError, TimeoutError)):
+            return True
+
+        return False
+
 
 # Global registry instance
 _model_registry: ModelRegistry | None = None
@@ -402,6 +568,28 @@ def reset_model_registry() -> None:
     """Reset the global model registry (for testing)."""
     global _model_registry
     _model_registry = None
+
+
+# Export FallbackExhaustedError for convenience
+from nim_sentinel.core.errors import FallbackExhaustedError
+
+__all__ = [
+    "ModelRegistry",
+    "get_model_registry",
+    "reset_model_registry",
+    "get_chat_model",
+    "get_embedding_model",
+    "get_rerank_model",
+    "tracked_chat_call",
+    "tracked_embedding_call",
+    "tracked_rerank_call",
+    "with_fallback",
+    "FallbackExhaustedError",
+    "CircuitBreaker",
+    "CircuitState",
+    "ModelMetrics",
+    "ModelFactory",
+]
 
 
 # Convenience functions
