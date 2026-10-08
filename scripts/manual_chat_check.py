@@ -41,7 +41,7 @@ async def test_chat_endpoint():
         if chat_response.status_code == 200:
             data = chat_response.json()
             print(f"Query: {data['query']}")
-            print(f"Answer: {data['answer'][:200]}...")
+            print(f"Answer: {data['answer'][:200].encode('ascii', 'replace').decode()}...")
             print(f"Confidence: {data['confidence']:.2f}")
             print(f"Total results: {data['total_results']}")
             print(f"Latency: {data['latency_ms']:.1f}ms")

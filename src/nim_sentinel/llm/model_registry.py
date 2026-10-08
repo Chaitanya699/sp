@@ -158,8 +158,11 @@ class ModelMetrics:
 class ModelFactory:
     """Factory for creating model instances."""
 
-    @staticmethod
+    def __init__(self, nvidia_api_key: str = "") -> None:
+        self.nvidia_api_key = nvidia_api_key
+
     def create_chat_model(
+        self,
         model_id: str,
         temperature: float = 0.1,
         max_tokens: int = 4096,
@@ -172,18 +175,17 @@ class ModelFactory:
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout,
+            nvidia_api_key=self.nvidia_api_key,
             **kwargs,
         )
 
-    @staticmethod
-    def create_embedding_model(model_id: str, **kwargs: Any) -> NVIDIAEmbeddings:
+    def create_embedding_model(self, model_id: str, **kwargs: Any) -> NVIDIAEmbeddings:
         """Create an NVIDIAEmbeddings instance."""
-        return NVIDIAEmbeddings(model=model_id, **kwargs)
+        return NVIDIAEmbeddings(model=model_id, nvidia_api_key=self.nvidia_api_key, **kwargs)
 
-    @staticmethod
-    def create_rerank_model(model_id: str, **kwargs: Any) -> NVIDIARerank:
+    def create_rerank_model(self, model_id: str, **kwargs: Any) -> NVIDIARerank:
         """Create an NVIDIARerank instance."""
-        return NVIDIARerank(model=model_id, **kwargs)
+        return NVIDIARerank(model=model_id, nvidia_api_key=self.nvidia_api_key, **kwargs)
 
 
 class ModelRegistry:
@@ -191,13 +193,13 @@ class ModelRegistry:
     Central model registry with fallback chains, circuit breakers, and metrics.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, nvidia_api_key: str = "") -> None:
         self._chat_models: dict[str, ChatNVIDIA] = {}
         self._embedding_models: dict[str, NVIDIAEmbeddings] = {}
         self._rerank_models: dict[str, NVIDIARerank] = {}
         self._circuit_breakers: dict[str, CircuitBreaker] = {}
         self._metrics: dict[str, ModelMetrics] = {}
-        self._factory = ModelFactory()
+        self._factory = ModelFactory(nvidia_api_key=nvidia_api_key)
         self._initialized = False
 
     def initialize(self) -> None:
@@ -559,7 +561,9 @@ def get_model_registry() -> ModelRegistry:
     """Get the global model registry instance."""
     global _model_registry
     if _model_registry is None:
-        _model_registry = ModelRegistry()
+        from nim_sentinel.core.config import get_settings
+        settings = get_settings()
+        _model_registry = ModelRegistry(nvidia_api_key=settings.nvidia_api_key)
         _model_registry.initialize()
     return _model_registry
 
