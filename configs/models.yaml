@@ -6,31 +6,31 @@
 model_registry:
   supervisor_llm:
     primary: "nvidia/nemotron-3-ultra-550b-a55b"
-    fallback: ""
+    fallback: "meta/llama-3.1-8b-instruct"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
     max_retries: 3
 
   reasoning_llm:
-    primary: "meta/llama-3.3-70b-instruct"
-    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
+    primary: "nvidia/nemotron-3-ultra-550b-a55b"
+    fallback: "meta/llama-3.1-8b-instruct"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
     max_retries: 3
 
   generator_llm:
-    primary: "meta/llama-3.1-70b-instruct"
-    fallback: "mistralai/mistral-large-3-675b-instruct-2512"
+    primary: "nvidia/nemotron-3-ultra-550b-a55b"
+    fallback: "meta/llama-3.1-8b-instruct"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
     max_retries: 3
 
   code_llm:
-    primary: "qwen/qwen2.5-coder-32b-instruct"
-    fallback: "mistralai/codestral-22b-instruct-v0.1"
+    primary: "nvidia/nemotron-3-ultra-550b-a55b"
+    fallback: "qwen/qwen2.5-coder-32b-instruct"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
@@ -111,7 +111,7 @@ model_registry:
 
   judge_llm:
     primary: "meta/llama-3.3-70b-instruct"
-    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
+    fallback: "meta/llama-3.1-70b-instruct"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
