@@ -1,13 +1,9 @@
 #!/usr/bin/env python
 """
 Benchmark script to test LLM candidates for NIM Sentinel.
-Tests 4 candidate models with 3 calls each:
-- meta/llama-3.3-70b-instruct
-- meta/llama-3.1-70b-instruct
-- meta/llama-3.1-8b-instruct
-- nvidia/nemotron-3-ultra-550b-a55b
+Tests candidate models with 3 calls each + structured output (JSON) test.
 
-Measures: latency, success rate, token usage, cost estimation
+Measures: latency, success rate, token usage, cost estimation, JSON validity
 """
 
 import asyncio
@@ -27,11 +23,16 @@ NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com
 if not NVIDIA_API_KEY:
     raise ValueError("NVIDIA_API_KEY not set in environment")
 
+# Extended candidate models list
 CANDIDATE_MODELS = [
-    "meta/llama-3.3-70b-instruct",
-    "meta/llama-3.1-70b-instruct",
-    "meta/llama-3.1-8b-instruct",
-    "nvidia/nemotron-3-ultra-550b-a55b",
+    "nvidia/nemotron-3-super-120b-a12b",
+    "nvidia/nemotron-3-nano-30b-a3b",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+    "openai/gpt-oss-120b",
+    "qwen/qwen3-next-80b-a3b-instruct",
+    "mistralai/mistral-small-3.1-24b-instruct-2503",
+    "google/gemma-3-27b-it",
+    "deepseek-ai/deepseek-v3.2",
 ]
 
 TEST_PROMPTS = [
@@ -39,6 +40,9 @@ TEST_PROMPTS = [
     "Explain quantum computing in simple terms.",
     "Write a Python function to calculate fibonacci numbers.",
 ]
+
+# JSON structured output test prompt
+JSON_TEST_PROMPT = """Return a JSON object with exactly these fields: {"name": "string", "age": "integer", "skills": "array of strings", "active": "boolean"}. Example: {"name": "John", "age": 30, "skills": ["Python", "SQL"], "active": true}. Return ONLY the JSON, no extra text."""
 
 NUM_CALLS_PER_MODEL = 3
 REQUEST_TIMEOUT = 60.0
@@ -55,6 +59,7 @@ class CallResult:
     total_tokens: int = 0
     error: str = ""
     response_preview: str = ""
+    json_valid: bool = False
 
 
 @dataclass
@@ -70,9 +75,12 @@ class ModelSummary:
     total_completion_tokens: int
     total_tokens: int
     estimated_cost_usd: float
+    json_tests: int = 0
+    json_passed: int = 0
+    json_pass_rate: float = 0.0
 
 
-async def call_model(client: httpx.AsyncClient, model: str, prompt: str) -> CallResult:
+async def call_model(client: httpx.AsyncClient, model: str, prompt: str, test_json: bool = False) -> CallResult:
     """Make a single call to the model and return results."""
     start = time.perf_counter()
 
@@ -101,6 +109,19 @@ async def call_model(client: httpx.AsyncClient, model: str, prompt: str) -> Call
             data = response.json()
             usage = data.get("usage", {})
             content = data["choices"][0]["message"]["content"]
+
+            # Test JSON validity if requested
+            json_valid = False
+            if test_json:
+                try:
+                    parsed = json.loads(content.strip())
+                    # Check required fields
+                    required = {"name", "age", "skills", "active"}
+                    if all(k in parsed for k in required):
+                        json_valid = True
+                except json.JSONDecodeError:
+                    json_valid = False
+
             return CallResult(
                 model=model,
                 prompt=prompt,
@@ -110,6 +131,7 @@ async def call_model(client: httpx.AsyncClient, model: str, prompt: str) -> Call
                 completion_tokens=usage.get("completion_tokens", 0),
                 total_tokens=usage.get("total_tokens", 0),
                 response_preview=content[:100] + "..." if len(content) > 100 else content,
+                json_valid=json_valid,
             )
         else:
             error_text = response.text
@@ -144,23 +166,28 @@ def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> flo
     """Estimate cost in USD based on model pricing (approximate)."""
     # Rough pricing per 1M tokens (input/output) - these are estimates
     pricing = {
-        "meta/llama-3.3-70b-instruct": (0.59, 0.79),
-        "meta/llama-3.1-70b-instruct": (0.59, 0.79),
-        "meta/llama-3.1-8b-instruct": (0.06, 0.06),
-        "nvidia/nemotron-3-ultra-550b-a55b": (1.00, 1.00),  # Premium model estimate
+        "nvidia/nemotron-3-super-120b-a12b": (0.50, 0.50),
+        "nvidia/nemotron-3-nano-30b-a3b": (0.10, 0.10),
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning": (0.15, 0.15),
+        "openai/gpt-oss-120b": (0.50, 0.50),
+        "qwen/qwen3-next-80b-a3b-instruct": (0.30, 0.30),
+        "mistralai/mistral-small-3.1-24b-instruct-2503": (0.20, 0.20),
+        "google/gemma-3-27b-it": (0.15, 0.15),
+        "deepseek-ai/deepseek-v3.2": (0.25, 0.25),
     }
     input_price, output_price = pricing.get(model, (0.50, 0.50))
     return (prompt_tokens * input_price + completion_tokens * output_price) / 1_000_000
 
 
 async def benchmark_model(model: str) -> List[CallResult]:
-    """Run benchmark for a single model across all prompts."""
+    """Run benchmark for a single model across all prompts + JSON test."""
     print(f"\n{'='*60}")
     print(f"Benchmarking: {model}")
     print(f"{'='*60}")
 
     results = []
     async with httpx.AsyncClient() as client:
+        # Regular prompts
         for i, prompt in enumerate(TEST_PROMPTS):
             for call_num in range(NUM_CALLS_PER_MODEL):
                 print(f"  Call {call_num + 1}/{NUM_CALLS_PER_MODEL} - Prompt {i + 1}/{len(TEST_PROMPTS)}: {prompt[:50]}...")
@@ -168,8 +195,16 @@ async def benchmark_model(model: str) -> List[CallResult]:
                 results.append(result)
                 status = "OK" if result.success else "FAIL"
                 print(f"    {status} {result.latency_ms:.0f}ms - {result.error or 'OK'}")
-                # Small delay between calls to avoid rate limiting
                 await asyncio.sleep(0.5)
+
+        # JSON structured output test
+        print(f"  JSON structured output test...")
+        json_result = await call_model(client, model, JSON_TEST_PROMPT, test_json=True)
+        results.append(json_result)
+        status = "OK" if json_result.success else "FAIL"
+        json_status = "JSON_OK" if json_result.json_valid else "JSON_FAIL"
+        print(f"    {status} {json_result.latency_ms:.0f}ms - {json_status} - {json_result.error or 'OK'}")
+        await asyncio.sleep(0.5)
     return results
 
 
@@ -198,6 +233,11 @@ def summarize_results(all_results: List[CallResult]) -> List[ModelSummary]:
 
         estimated_cost = estimate_cost(model, total_prompt_tokens, total_completion_tokens)
 
+        # JSON test stats
+        json_tests = [r for r in model_results if r.prompt == JSON_TEST_PROMPT]
+        json_passed = sum(1 for r in json_tests if r.json_valid)
+        json_pass_rate = json_passed / len(json_tests) if json_tests else 0.0
+
         summaries.append(ModelSummary(
             model=model,
             total_calls=total_calls,
@@ -210,34 +250,48 @@ def summarize_results(all_results: List[CallResult]) -> List[ModelSummary]:
             total_completion_tokens=total_completion_tokens,
             total_tokens=total_tokens,
             estimated_cost_usd=estimated_cost,
+            json_tests=len(json_tests),
+            json_passed=json_passed,
+            json_pass_rate=json_pass_rate,
         ))
     return summaries
 
 
 def print_summary_table(summaries: List[ModelSummary]):
     """Print a formatted summary table."""
-    print(f"\n{'='*120}")
+    print(f"\n{'='*140}")
     print("BENCHMARK SUMMARY")
-    print(f"{'='*120}")
-    print(f"{'Model':<40} {'Calls':>5} {'Success':>7} {'Rate':>6} {'Avg(ms)':>8} {'Min(ms)':>8} {'Max(ms)':>8} {'Tokens':>10} {'Cost($)':>10}")
-    print(f"{'-'*120}")
+    print(f"{'='*140}")
+    print(f"{'Model':<45} {'Calls':>5} {'Succ':>4} {'Rate':>6} {'Avg(ms)':>8} {'Min(ms)':>8} {'Max(ms)':>8} {'Tokens':>10} {'Cost($)':>10} {'JSON':>4} {'J%':>6}")
+    print(f"{'-'*140}")
 
     for s in summaries:
-        print(f"{s.model:<40} {s.total_calls:>5} {s.successful_calls:>7} {s.success_rate:>6.0%} {s.avg_latency_ms:>8.0f} {s.min_latency_ms:>8.0f} {s.max_latency_ms:>8.0f} {s.total_tokens:>10} {s.estimated_cost_usd:>10.4f}")
+        json_str = f"{s.json_passed}/{s.json_tests}"
+        print(f"{s.model:<45} {s.total_calls:>5} {s.successful_calls:>4} {s.success_rate:>6.0%} {s.avg_latency_ms:>8.0f} {s.min_latency_ms:>8.0f} {s.max_latency_ms:>8.0f} {s.total_tokens:>10} {s.estimated_cost_usd:>10.4f} {json_str:>4} {s.json_pass_rate:>6.0%}")
 
-    print(f"{'-'*120}")
+    print(f"{'-'*140}")
+
+    # Filter out failed models (404/410/503)
+    working_models = [s for s in summaries if s.success_rate > 0]
+    failed_models = [s for s in summaries if s.success_rate == 0]
+
+    if failed_models:
+        print(f"\nEXCLUDED MODELS (404/410/503/timeout):")
+        for s in failed_models:
+            print(f"  {s.model}")
 
     # Best model recommendations
-    successful_summaries = [s for s in summaries if s.success_rate > 0]
-    if successful_summaries:
-        fastest = min(successful_summaries, key=lambda s: s.avg_latency_ms)
-        most_reliable = max(successful_summaries, key=lambda s: s.success_rate)
-        cheapest = min(successful_summaries, key=lambda s: s.estimated_cost_usd)
+    if working_models:
+        fastest = min(working_models, key=lambda s: s.avg_latency_ms)
+        most_reliable = max(working_models, key=lambda s: s.success_rate)
+        cheapest = min(working_models, key=lambda s: s.estimated_cost_usd)
+        best_json = max(working_models, key=lambda s: s.json_pass_rate)
 
         print(f"\nRECOMMENDATIONS:")
         print(f"  Fastest (avg latency):     {fastest.model} ({fastest.avg_latency_ms:.0f}ms)")
         print(f"  Most reliable (success%):  {most_reliable.model} ({most_reliable.success_rate:.0%})")
         print(f"  Cheapest (estimated):      {cheapest.model} (${cheapest.estimated_cost_usd:.4f})")
+        print(f"  Best JSON output:          {best_json.model} ({best_json.json_pass_rate:.0%})")
 
 
 def save_results(all_results: List[CallResult], summaries: List[ModelSummary]):
@@ -247,6 +301,7 @@ def save_results(all_results: List[CallResult], summaries: List[ModelSummary]):
         "config": {
             "models_tested": CANDIDATE_MODELS,
             "prompts": TEST_PROMPTS,
+            "json_test_prompt": JSON_TEST_PROMPT,
             "calls_per_model_per_prompt": NUM_CALLS_PER_MODEL,
         },
         "detailed_results": [asdict(r) for r in all_results],
@@ -261,7 +316,8 @@ def save_results(all_results: List[CallResult], summaries: List[ModelSummary]):
 
 async def main():
     print("NIM Sentinel - Model Benchmark")
-    print(f"Testing {len(CANDIDATE_MODELS)} models x {len(TEST_PROMPTS)} prompts x {NUM_CALLS_PER_MODEL} calls = {len(CANDIDATE_MODELS) * len(TEST_PROMPTS) * NUM_CALLS_PER_MODEL} total calls")
+    total_calls = len(CANDIDATE_MODELS) * (len(TEST_PROMPTS) * NUM_CALLS_PER_MODEL + 1)
+    print(f"Testing {len(CANDIDATE_MODELS)} models x ({len(TEST_PROMPTS)} prompts x {NUM_CALLS_PER_MODEL} calls + 1 JSON test) = {total_calls} total calls")
 
     all_results = []
     for model in CANDIDATE_MODELS:

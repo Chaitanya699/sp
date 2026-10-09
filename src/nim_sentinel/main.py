@@ -14,12 +14,45 @@ from nim_sentinel.api import router as api_router
 from nim_sentinel.core.config import get_settings
 from nim_sentinel.core.logging import setup_logging
 from nim_sentinel.db.client import close_mongo_connection, connect_to_mongo
+from nim_sentinel.llm.model_registry import get_model_registry
 
 # Setup logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
+
+
+async def check_model_health() -> None:
+    """Non-blocking health check for configured models at startup."""
+    try:
+        registry = get_model_registry()
+        roles = [
+            "supervisor_llm",
+            "critic_llm",
+            "generator_llm",
+            "code_llm",
+            "reasoning_llm",
+            "embedding",
+            "reranker",
+        ]
+
+        for role in roles:
+            try:
+                config = registry._factory.create_chat_model if role != "embedding" and role != "reranker" else None
+                # Just verify the model can be instantiated (doesn't make API call)
+                if role in ["embedding"]:
+                    registry.get_embedding_model(role)
+                elif role in ["reranker"]:
+                    registry.get_rerank_model(role)
+                else:
+                    registry.get_chat_model(role)
+                logger.info(f"Model health check OK: {role}")
+            except Exception as e:
+                # Non-blocking: log WARNING but don't fail startup
+                logger.warning(f"Model health check failed for {role}: {e}")
+    except Exception as e:
+        logger.warning(f"Model health check skipped: {e}")
 
 
 @asynccontextmanager
@@ -29,6 +62,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting NIM Sentinel API")
     await connect_to_mongo()
     logger.info("MongoDB connected")
+
+    # Non-blocking model health checks
+    await check_model_health()
 
     yield
 

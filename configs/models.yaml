@@ -4,33 +4,46 @@
 # Replace with verified alternatives before production use
 
 model_registry:
+  # Supervisor/Grader: small fast non-reasoning model for routing decisions
   supervisor_llm:
-    primary: "nvidia/nemotron-3-super-120b-a12b"
-    fallback: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
-    temperature: 0.1
-    max_tokens: 4096
-    timeout_seconds: 30
-    max_retries: 3
-
-  reasoning_llm:
-    primary: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    primary: "meta/llama-3.1-8b-instruct"
     fallback: "nvidia/nemotron-3-super-120b-a12b"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
     max_retries: 3
 
-  generator_llm:
+  # Critic: reasoning model for answer review
+  critic_llm:
     primary: "nvidia/nemotron-3-super-120b-a12b"
-    fallback: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
     max_retries: 3
 
+  # Generator: medium/large model for answer generation
+  generator_llm:
+    primary: "nvidia/nemotron-3-super-120b-a12b"
+    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
+    temperature: 0.1
+    max_tokens: 4096
+    timeout_seconds: 30
+    max_retries: 3
+
+  # Code LLM: for code generation tasks
   code_llm:
     primary: "nvidia/nemotron-3-super-120b-a12b"
-    fallback: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
+    temperature: 0.1
+    max_tokens: 4096
+    timeout_seconds: 30
+    max_retries: 3
+
+  # Reasoning LLM: for complex reasoning tasks
+  reasoning_llm:
+    primary: "nvidia/nemotron-3-super-120b-a12b"
+    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
@@ -111,7 +124,7 @@ model_registry:
 
   judge_llm:
     primary: "nvidia/nemotron-3-super-120b-a12b"
-    fallback: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
