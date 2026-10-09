@@ -5,9 +5,11 @@
 
 model_registry:
   # Supervisor/Grader: small fast non-reasoning model for routing decisions
+  # Using nemotron-3-super-120b-a12b (100% success in benchmark) as primary
+  # Fallback: nemotron-3-nano-omni-30b-a3b-reasoning (30% success, but works when available)
   supervisor_llm:
-    primary: "meta/llama-3.1-8b-instruct"
-    fallback: "nvidia/nemotron-3-super-120b-a12b"
+    primary: "nvidia/nemotron-3-super-120b-a12b"
+    fallback: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
@@ -16,7 +18,7 @@ model_registry:
   # Critic: reasoning model for answer review
   critic_llm:
     primary: "nvidia/nemotron-3-super-120b-a12b"
-    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
+    fallback: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
@@ -25,7 +27,7 @@ model_registry:
   # Generator: medium/large model for answer generation
   generator_llm:
     primary: "nvidia/nemotron-3-super-120b-a12b"
-    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
+    fallback: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
@@ -34,7 +36,7 @@ model_registry:
   # Code LLM: for code generation tasks
   code_llm:
     primary: "nvidia/nemotron-3-super-120b-a12b"
-    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
+    fallback: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
@@ -43,7 +45,7 @@ model_registry:
   # Reasoning LLM: for complex reasoning tasks
   reasoning_llm:
     primary: "nvidia/nemotron-3-super-120b-a12b"
-    fallback: "nvidia/nemotron-3-ultra-550b-a55b"
+    fallback: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
