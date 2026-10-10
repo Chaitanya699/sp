@@ -9,10 +9,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from nim_sentinel.guardrails.groundedness import check_groundedness, GroundednessResult
+from nim_sentinel.guardrails.groundedness import GroundednessResult, check_groundedness
 from nim_sentinel.guardrails.nemoguard import (
     NemoGuardClient,
-    NemoGuardResult,
     get_nemo_guard_client,
 )
 from nim_sentinel.guardrails.pii import detect_pii
@@ -22,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class GuardAction(StrEnum):
     """Action to take when guardrail triggers."""
+
     ALLOW = "allow"
     BLOCK = "block"
     FLAG = "flag"
@@ -29,6 +29,7 @@ class GuardAction(StrEnum):
 
 class GuardCategory(StrEnum):
     """Categories of guardrail checks."""
+
     CONTENT_SAFETY = "content_safety"
     GROUNDEDNESS = "groundedness"
     PII = "pii"
@@ -37,6 +38,7 @@ class GuardCategory(StrEnum):
 @dataclass
 class GuardResult:
     """Result of a guardrail check."""
+
     category: GuardCategory
     action: GuardAction
     triggered: bool
@@ -58,6 +60,7 @@ class GuardResult:
 @dataclass
 class GuardrailResponse:
     """Combined response from multiple guardrails."""
+
     allowed: bool
     results: list[GuardResult]
     modified_content: str | None = None
@@ -91,7 +94,9 @@ class OutputGuardrails:
             self._nemoguard = get_nemo_guard_client()
         return self._nemoguard
 
-    def check_groundedness(self, answer: str, citations: list[dict[str, Any]] | None) -> GuardResult:
+    def check_groundedness(
+        self, answer: str, citations: list[dict[str, Any]] | None
+    ) -> GuardResult:
         """Check if answer is grounded in citations."""
         result: GroundednessResult = check_groundedness(answer, citations)
 

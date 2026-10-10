@@ -5,24 +5,22 @@ LangGraph checkpointer implementation using MongoDB for persistence.
 """
 
 import logging
-from typing import Any, Optional, AsyncIterator, Sequence
-from datetime import datetime
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Any
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
     BaseCheckpointSaver,
     Checkpoint,
     CheckpointMetadata,
     CheckpointTuple,
 )
-from langchain_core.runnables import RunnableConfig
+from nim_sentinel.db.client import get_database
 from pymongo import ASCENDING
-from pymongo.errors import DuplicateKeyError
-from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.asynchronous.collection import AsyncCollection
-
-from nim_sentinel.db.client import get_mongo_client, get_database
-from nim_sentinel.core.config import get_settings
+from pymongo.asynchronous.database import AsyncDatabase
 
 logger = logging.getLogger(__name__)
 
@@ -57,36 +55,43 @@ class MongoDBCheckpointer(BaseCheckpointSaver[int]):
 
         # Create indexes (only once per instance)
         if not self._indexes_created:
-            await self._collection.create_index([
-                ("tenant_id", ASCENDING),
-                ("thread_id", ASCENDING),
-                ("checkpoint_ns", ASCENDING),
-                ("checkpoint_id", ASCENDING),
-            ], unique=True)
+            await self._collection.create_index(
+                [
+                    ("tenant_id", ASCENDING),
+                    ("thread_id", ASCENDING),
+                    ("checkpoint_ns", ASCENDING),
+                    ("checkpoint_id", ASCENDING),
+                ],
+                unique=True,
+            )
 
-            await self._collection.create_index([
-                ("tenant_id", ASCENDING),
-                ("thread_id", ASCENDING),
-                ("updated_at", -1),
-            ])
+            await self._collection.create_index(
+                [
+                    ("tenant_id", ASCENDING),
+                    ("thread_id", ASCENDING),
+                    ("updated_at", -1),
+                ]
+            )
             self._indexes_created = True
 
         return self._collection
 
-    def _serialize_checkpoint(self, checkpoint: Checkpoint, config: RunnableConfig) -> dict[str, Any]:
+    def _serialize_checkpoint(
+        self, checkpoint: Checkpoint, config: RunnableConfig
+    ) -> dict[str, Any]:
         """Serialize checkpoint to MongoDB document."""
         configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
 
         def serialize_value(value: Any) -> Any:
             """Recursively serialize values to MongoDB-compatible types."""
-            if hasattr(value, '__dataclass_fields__'):
+            if hasattr(value, "__dataclass_fields__"):
                 # It's a dataclass, convert to dict
                 return {k: serialize_value(v) for k, v in value.__dict__.items()}
             elif isinstance(value, list):
                 return [serialize_value(v) for v in value]
             elif isinstance(value, dict):
                 return {k: serialize_value(v) for k, v in value.items()}
-            elif hasattr(value, '__dict__'):
+            elif hasattr(value, "__dict__"):
                 # Generic object with __dict__
                 return serialize_value(value.__dict__)
             else:
@@ -140,7 +145,9 @@ class MongoDBCheckpointer(BaseCheckpointSaver[int]):
                     "thread_id": doc["thread_id"],
                     "checkpoint_ns": doc["checkpoint_ns"],
                 }
-            } if doc.get("parent_checkpoint_id") else None,
+            }
+            if doc.get("parent_checkpoint_id")
+            else None,
         )
 
     async def aput(
@@ -168,9 +175,11 @@ class MongoDBCheckpointer(BaseCheckpointSaver[int]):
             upsert=True,
         )
 
-        return {"configurable": {"thread_id": doc["thread_id"], "checkpoint_ns": doc["checkpoint_ns"]}}
+        return {
+            "configurable": {"thread_id": doc["thread_id"], "checkpoint_ns": doc["checkpoint_ns"]}
+        }
 
-    async def aget_tuple(self, config: RunnableConfig) -> Optional[CheckpointTuple]:
+    async def aget_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
         """Get a checkpoint tuple by config."""
         collection = await self._get_collection()
 
@@ -202,11 +211,11 @@ class MongoDBCheckpointer(BaseCheckpointSaver[int]):
 
     async def alist(
         self,
-        config: Optional[RunnableConfig] = None,
+        config: RunnableConfig | None = None,
         *,
-        filter: Optional[dict[str, Any]] = None,
-        before: Optional[RunnableConfig] = None,
-        limit: Optional[int] = None,
+        filter: dict[str, Any] | None = None,
+        before: RunnableConfig | None = None,
+        limit: int | None = None,
     ) -> AsyncIterator[CheckpointTuple]:
         """List checkpoints."""
         collection = await self._get_collection()
@@ -240,10 +249,12 @@ class MongoDBCheckpointer(BaseCheckpointSaver[int]):
     async def adelete_thread(self, thread_id: str) -> None:
         """Delete all checkpoints for a thread."""
         collection = await self._get_collection()
-        await collection.delete_many({
-            "tenant_id": self.tenant_id,
-            "thread_id": thread_id,
-        })
+        await collection.delete_many(
+            {
+                "tenant_id": self.tenant_id,
+                "thread_id": thread_id,
+            }
+        )
 
     async def aput_writes(
         self,

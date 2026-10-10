@@ -5,8 +5,8 @@ FastAPI application with all routes and middleware.
 """
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,7 +39,6 @@ async def check_model_health() -> None:
 
         for role in roles:
             try:
-                config = registry._factory.create_chat_model if role != "embedding" and role != "reranker" else None
                 # Just verify the model can be instantiated (doesn't make API call)
                 if role in ["embedding"]:
                     registry.get_embedding_model(role)

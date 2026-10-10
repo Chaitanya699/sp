@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class NemoGuardModel(StrEnum):
     """NemoGuard model types."""
+
     CONTENT_SAFETY = "safety_content"
     JAILBREAK = "safety_jailbreak"
     TOPIC_CONTROL = "safety_topic"
@@ -24,6 +25,7 @@ class NemoGuardModel(StrEnum):
 
 class NemoGuardAction(StrEnum):
     """Actions from NemoGuard."""
+
     ALLOW = "allow"
     BLOCK = "block"
     FLAG = "flag"
@@ -32,6 +34,7 @@ class NemoGuardAction(StrEnum):
 @dataclass
 class NemoGuardResult:
     """Result from NemoGuard model."""
+
     model: NemoGuardModel
     action: NemoGuardAction
     triggered: bool
@@ -248,19 +251,25 @@ Text: {text}"""
         )
 
         return {
-            "content_safety": results[0] if isinstance(results[0], NemoGuardResult) else NemoGuardResult(
+            "content_safety": results[0]
+            if isinstance(results[0], NemoGuardResult)
+            else NemoGuardResult(
                 model=NemoGuardModel.CONTENT_SAFETY,
                 action=NemoGuardAction.ALLOW,
                 triggered=False,
                 error=str(results[0]),
             ),
-            "jailbreak": results[1] if isinstance(results[1], NemoGuardResult) else NemoGuardResult(
+            "jailbreak": results[1]
+            if isinstance(results[1], NemoGuardResult)
+            else NemoGuardResult(
                 model=NemoGuardModel.JAILBREAK,
                 action=NemoGuardAction.ALLOW,
                 triggered=False,
                 error=str(results[1]),
             ),
-            "topic": results[2] if isinstance(results[2], NemoGuardResult) else NemoGuardResult(
+            "topic": results[2]
+            if isinstance(results[2], NemoGuardResult)
+            else NemoGuardResult(
                 model=NemoGuardModel.TOPIC_CONTROL,
                 action=NemoGuardAction.ALLOW,
                 triggered=False,

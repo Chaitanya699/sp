@@ -4,11 +4,10 @@ Tests for Guardrails - PII module
 
 import pytest
 from nim_sentinel.guardrails.pii import (
+    PII_PATTERNS,
     detect_pii,
     redact_pii,
     redact_pii_dict,
-    PIIResult,
-    PII_PATTERNS,
 )
 
 
@@ -62,7 +61,9 @@ class TestPIIPatterns:
     def test_jwt_pattern(self):
         """Test JWT detection."""
         pattern = PII_PATTERNS["jwt"]
-        assert pattern.search("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c")
+        assert pattern.search(
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+        )
         assert not pattern.search("not-a-jwt")
 
     def test_aadhaar_pattern(self):

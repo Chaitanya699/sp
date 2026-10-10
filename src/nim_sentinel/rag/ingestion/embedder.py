@@ -293,6 +293,7 @@ async def get_embedding_client() -> EmbeddingClient:
         settings = get_settings()
         # Use model registry for embedding model (not settings.embedding_model which defaults to empty)
         from nim_sentinel.core.config import get_model_config
+
         embedding_config = get_model_config("embedding")
         _embedding_client = EmbeddingClient(
             model=embedding_config.primary,

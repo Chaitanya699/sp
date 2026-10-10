@@ -173,6 +173,7 @@ class HybridRetriever:
 
         RRF score = sum(1 / (k + rank)) for each result across all sources.
         """
+
         # Create unique key for each chunk (document_id + chunk_index)
         def make_key(doc: dict[str, Any]) -> str:
             return f"{doc['document_id']}_{doc['chunk_index']}"

@@ -2,18 +2,17 @@
 Tests for Guardrails - Output Guard module
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from nim_sentinel.guardrails.nemoguard import NemoGuardAction, NemoGuardModel, NemoGuardResult
 from nim_sentinel.guardrails.output_guard import (
-    OutputGuardrails,
-    GuardrailResponse,
-    GuardResult,
     GuardAction,
     GuardCategory,
+    OutputGuardrails,
     get_output_guardrails,
     reset_output_guardrails,
 )
-from nim_sentinel.guardrails.nemoguard import NemoGuardResult, NemoGuardModel, NemoGuardAction
 
 
 class TestOutputGuardrails:
@@ -34,7 +33,9 @@ class TestOutputGuardrails:
 
     def test_check_groundedness_with_citations(self, guardrails):
         """Test groundedness passes with citations."""
-        citations = [{"content": "The answer is 42 according to the documentation and verified sources"}]
+        citations = [
+            {"content": "The answer is 42 according to the documentation and verified sources"}
+        ]
         result = guardrails.check_groundedness("The answer is 42", citations)
         assert result.triggered is False
         assert result.action == GuardAction.ALLOW
@@ -114,7 +115,9 @@ class TestOutputGuardrails:
         """Test check_all flags ungrounded answer."""
         response = await guardrails.check_all("The answer is 42", citations=None)
         assert response.allowed is True  # FLAG doesn't block
-        assert any(r.category == GuardCategory.GROUNDEDNESS and r.triggered for r in response.results)
+        assert any(
+            r.category == GuardCategory.GROUNDEDNESS and r.triggered for r in response.results
+        )
 
     @pytest.mark.asyncio
     async def test_check_all_nemoguard_block(self, guardrails):
@@ -131,7 +134,9 @@ class TestOutputGuardrails:
             citations = [{"content": "Some content"}]
             response = await guardrails.check_all("Hateful content", citations=citations)
             assert response.allowed is False
-            assert any(r.category == GuardCategory.CONTENT_SAFETY and r.triggered for r in response.results)
+            assert any(
+                r.category == GuardCategory.CONTENT_SAFETY and r.triggered for r in response.results
+            )
 
 
 class TestOutputGuardrailsSingleton:

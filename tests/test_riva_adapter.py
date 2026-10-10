@@ -131,6 +131,7 @@ class TestRivaASRAdapter:
         """Test offline transcription error handling."""
         import grpc
         from nim_sentinel.core import ModelUnavailableError
+
         mock_asr_service.return_value.offline_recognize.side_effect = grpc.RpcError()
 
         adapter = RivaASRAdapter(RivaConfig(uri="test:50051"))
@@ -187,6 +188,7 @@ class TestRivaTTSAdapter:
         """Test speech synthesis error handling."""
         import grpc
         from nim_sentinel.core import ModelUnavailableError
+
         mock_tts_service.return_value.synthesize.side_effect = grpc.RpcError()
 
         adapter = RivaTTSAdapter(RivaConfig(uri="test:50051"))
@@ -233,13 +235,16 @@ class TestGlobalAdapters:
 class TestCreateRivaConfigFromEnv:
     """Tests for create_riva_config_from_env function."""
 
-    @patch.dict("os.environ", {
-        "RIVA_URI": "env:50051",
-        "RIVA_USE_SSL": "true",
-        "RIVA_API_KEY": "env-key",
-        "RIVA_LANGUAGE_CODE": "fr-FR",
-        "RIVA_SAMPLE_RATE": "22050",
-    })
+    @patch.dict(
+        "os.environ",
+        {
+            "RIVA_URI": "env:50051",
+            "RIVA_USE_SSL": "true",
+            "RIVA_API_KEY": "env-key",
+            "RIVA_LANGUAGE_CODE": "fr-FR",
+            "RIVA_SAMPLE_RATE": "22050",
+        },
+    )
     def test_create_from_env(self):
         """Test creating config from environment variables."""
         config = create_riva_config_from_env()
@@ -258,4 +263,3 @@ class TestCreateRivaConfigFromEnv:
         assert config.api_key is None
         assert config.language_code == "en-US"
         assert config.sample_rate_hz == 16000
-

@@ -106,7 +106,12 @@ class InvalidTokenError(AuthenticationError):
 class RateLimitError(NIMException):
     """Raised when rate limit is exceeded."""
 
-    def __init__(self, message: str = "Rate limit exceeded", retry_after: int = 60, details: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        message: str = "Rate limit exceeded",
+        retry_after: int = 60,
+        details: dict[str, Any] | None = None,
+    ):
         super().__init__(
             message,
             code="RATE_LIMIT_EXCEEDED",
@@ -119,7 +124,9 @@ class RateLimitError(NIMException):
 class ValidationError(NIMException):
     """Raised when input validation fails."""
 
-    def __init__(self, message: str, field: str | None = None, details: dict[str, Any] | None = None):
+    def __init__(
+        self, message: str, field: str | None = None, details: dict[str, Any] | None = None
+    ):
         super().__init__(
             message,
             code="VALIDATION_ERROR",
@@ -241,7 +248,9 @@ class CitationRequiredError(OutputGuardrailError):
 class ModelError(NIMException):
     """Base class for model-related errors."""
 
-    def __init__(self, message: str, model_role: str, model_id: str, details: dict[str, Any] | None = None):
+    def __init__(
+        self, message: str, model_role: str, model_id: str, details: dict[str, Any] | None = None
+    ):
         super().__init__(
             message,
             code="MODEL_ERROR",
@@ -265,7 +274,9 @@ class ModelUnavailableError(ModelError):
 class ModelTimeoutError(ModelError):
     """Raised when a model request times out."""
 
-    def __init__(self, model_role: str, model_id: str, timeout: int, details: dict[str, Any] | None = None):
+    def __init__(
+        self, model_role: str, model_id: str, timeout: int, details: dict[str, Any] | None = None
+    ):
         super().__init__(
             f"Model '{model_id}' request timed out after {timeout}s",
             model_role=model_role,
@@ -277,7 +288,13 @@ class ModelTimeoutError(ModelError):
 class ModelRateLimitError(ModelError):
     """Raised when model API rate limit is hit."""
 
-    def __init__(self, model_role: str, model_id: str, retry_after: int = 60, details: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        model_role: str,
+        model_id: str,
+        retry_after: int = 60,
+        details: dict[str, Any] | None = None,
+    ):
         super().__init__(
             f"Model '{model_id}' rate limit exceeded",
             model_role=model_role,
@@ -290,7 +307,9 @@ class ModelRateLimitError(ModelError):
 class FallbackExhaustedError(ModelError):
     """Raised when all model fallbacks are exhausted."""
 
-    def __init__(self, model_role: str, tried_models: list[str], details: dict[str, Any] | None = None):
+    def __init__(
+        self, model_role: str, tried_models: list[str], details: dict[str, Any] | None = None
+    ):
         super().__init__(
             f"All fallbacks exhausted for role '{model_role}': {', '.join(tried_models)}",
             model_role=model_role,
@@ -329,7 +348,9 @@ class TenantIsolationError(DatabaseError):
 class MongoConnectionError(DatabaseError):
     """Raised when MongoDB connection fails."""
 
-    def __init__(self, message: str = "Failed to connect to MongoDB", details: dict[str, Any] | None = None):
+    def __init__(
+        self, message: str = "Failed to connect to MongoDB", details: dict[str, Any] | None = None
+    ):
         super().__init__(message, "connect", details)
 
 
@@ -500,7 +521,9 @@ class LangSmithError(ExternalServiceError):
 class GraphError(NIMException):
     """Base class for LangGraph errors."""
 
-    def __init__(self, message: str, node: str | None = None, details: dict[str, Any] | None = None):
+    def __init__(
+        self, message: str, node: str | None = None, details: dict[str, Any] | None = None
+    ):
         super().__init__(
             message,
             code="GRAPH_ERROR",

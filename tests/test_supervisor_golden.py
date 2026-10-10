@@ -5,9 +5,10 @@ Evaluates the supervisor's routing accuracy against the golden dataset.
 """
 
 import pytest
-from nim_sentinel.graph.supervisor import Supervisor
 from nim_sentinel.graph.state import AgentState, create_initial_state
-from tests.golden_supervisor_dataset import get_golden_examples, GoldenExample
+from nim_sentinel.graph.supervisor import Supervisor
+
+from tests.golden_supervisor_dataset import get_golden_examples
 
 
 class TestSupervisorGoldenDataset:
@@ -67,16 +68,18 @@ class TestSupervisorGoldenDataset:
                 for keyword in example.expected_reasoning_contains
             )
 
-            results.append({
-                "query": example.query,
-                "category": example.category,
-                "expected_route": example.expected_route,
-                "actual_route": decision.next_node,
-                "route_match": passed,
-                "reasoning": decision.reasoning,
-                "reasoning_matches": reasoning_matches,
-                "confidence": decision.confidence,
-            })
+            results.append(
+                {
+                    "query": example.query,
+                    "category": example.category,
+                    "expected_route": example.expected_route,
+                    "actual_route": decision.next_node,
+                    "route_match": passed,
+                    "reasoning": decision.reasoning,
+                    "reasoning_matches": reasoning_matches,
+                    "confidence": decision.confidence,
+                }
+            )
 
             # Assert routing matches
             assert passed, (
@@ -92,23 +95,29 @@ class TestSupervisorGoldenDataset:
         reasoning_correct = sum(1 for r in results if r["reasoning_matches"])
 
         print(f"\n{'='*60}")
-        print(f"SUPERVISOR GOLDEN DATASET EVALUATION")
+        print("SUPERVISOR GOLDEN DATASET EVALUATION")
         print(f"{'='*60}")
         print(f"Total examples: {total}")
         print(f"Routing accuracy: {correct}/{total} ({correct/total*100:.1f}%)")
-        print(f"Reasoning keyword match: {reasoning_correct}/{total} ({reasoning_correct/total*100:.1f}%)")
+        print(
+            f"Reasoning keyword match: {reasoning_correct}/{total} ({reasoning_correct/total*100:.1f}%)"
+        )
 
         # Per-category breakdown
         categories = set(r["category"] for r in results)
         for cat in sorted(categories):
             cat_results = [r for r in results if r["category"] == cat]
             cat_correct = sum(1 for r in cat_results if r["route_match"])
-            print(f"  {cat}: {cat_correct}/{len(cat_results)} ({cat_correct/len(cat_results)*100:.1f}%)")
+            print(
+                f"  {cat}: {cat_correct}/{len(cat_results)} ({cat_correct/len(cat_results)*100:.1f}%)"
+            )
 
         print(f"{'='*60}")
 
         # Require at least 90% accuracy
-        assert correct / total >= 0.9, f"Routing accuracy {correct/total*100:.1f}% below 90% threshold"
+        assert (
+            correct / total >= 0.9
+        ), f"Routing accuracy {correct/total*100:.1f}% below 90% threshold"
 
     @pytest.mark.asyncio
     async def test_greeting_routes_to_end(self, supervisor, base_state):
@@ -135,7 +144,9 @@ class TestSupervisorGoldenDataset:
             )
 
             decision = await supervisor.decide(state)
-            assert decision.next_node == "end", f"Greeting '{greeting}' should route to end, got {decision.next_node}"
+            assert (
+                decision.next_node == "end"
+            ), f"Greeting '{greeting}' should route to end, got {decision.next_node}"
 
     @pytest.mark.asyncio
     async def test_factual_queries_route_to_rag(self, supervisor, base_state):
@@ -168,7 +179,9 @@ class TestSupervisorGoldenDataset:
             )
 
             decision = await supervisor.decide(state)
-            assert decision.next_node == "rag_subgraph", f"Query '{query}' should route to rag_subgraph, got {decision.next_node}"
+            assert (
+                decision.next_node == "rag_subgraph"
+            ), f"Query '{query}' should route to rag_subgraph, got {decision.next_node}"
 
     @pytest.mark.asyncio
     async def test_answer_exists_routes_to_critic(self, supervisor, base_state):
@@ -192,7 +205,9 @@ class TestSupervisorGoldenDataset:
         )
 
         decision = await supervisor.decide(state)
-        assert decision.next_node == "critic", f"Answer exists should route to critic, got {decision.next_node}"
+        assert (
+            decision.next_node == "critic"
+        ), f"Answer exists should route to critic, got {decision.next_node}"
 
     @pytest.mark.asyncio
     async def test_max_retries_routes_to_end(self, supervisor, base_state):
@@ -216,7 +231,9 @@ class TestSupervisorGoldenDataset:
         )
 
         decision = await supervisor.decide(state)
-        assert decision.next_node == "end", f"Max retries should route to end, got {decision.next_node}"
+        assert (
+            decision.next_node == "end"
+        ), f"Max retries should route to end, got {decision.next_node}"
 
     @pytest.mark.asyncio
     async def test_critic_approved_routes_to_end(self, supervisor, base_state):
@@ -234,13 +251,21 @@ class TestSupervisorGoldenDataset:
             needs_critique=False,
             critique_feedback="Approved: Answer is accurate and well-cited.",
             retry_count=0,
-            metadata={"critic_output": {"approved": True, "feedback": "Approved: Answer is accurate and well-cited.", "confidence": 0.9}},
+            metadata={
+                "critic_output": {
+                    "approved": True,
+                    "feedback": "Approved: Answer is accurate and well-cited.",
+                    "confidence": 0.9,
+                }
+            },
             created_at=base_state.created_at,
             updated_at=base_state.updated_at,
         )
 
         decision = await supervisor.decide(state)
-        assert decision.next_node == "end", f"Critic approved should route to end, got {decision.next_node}"
+        assert (
+            decision.next_node == "end"
+        ), f"Critic approved should route to end, got {decision.next_node}"
 
 
 if __name__ == "__main__":

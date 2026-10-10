@@ -1,6 +1,5 @@
 """Pytest configuration for NIM Sentinel tests."""
 
-import os
 from dotenv import load_dotenv
 
 # Load .env file for all tests

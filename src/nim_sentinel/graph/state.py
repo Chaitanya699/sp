@@ -4,9 +4,10 @@ NIM Sentinel LangGraph State Definitions
 Defines the state schema for the multi-agent RAG system.
 """
 
-from typing import Any, Literal
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Literal
+
 from langchain_core.messages import BaseMessage
 from nim_sentinel.rag.retriever import RetrievalResult
 
@@ -31,6 +32,7 @@ class AgentState:
         retry_count: Number of retries
         metadata: Additional metadata
     """
+
     messages: list[BaseMessage] = field(default_factory=list)
     query: str = ""
     tenant_id: str = ""
@@ -51,6 +53,7 @@ class AgentState:
 @dataclass
 class SupervisorDecision:
     """Decision output from supervisor node."""
+
     next_node: Literal["rag_subgraph", "critic", "end"]
     reasoning: str
     confidence: float
@@ -59,6 +62,7 @@ class SupervisorDecision:
 @dataclass
 class CriticOutput:
     """Output from critic node."""
+
     approved: bool
     feedback: str
     confidence: float

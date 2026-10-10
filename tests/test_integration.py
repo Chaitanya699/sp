@@ -10,9 +10,9 @@ Run with: pytest tests/test_integration.py -v -m integration
 """
 
 import os
+
 import pytest
-import pytest_asyncio
-from pathlib import Path
+
 
 # Check if integration test prerequisites are met
 def check_integration_prerequisites():
@@ -45,8 +45,7 @@ prereq_ok, prereq_msg = check_integration_prerequisites()
 
 # Skip all integration tests if prerequisites not met
 pytestmark = pytest.mark.skipif(
-    not prereq_ok,
-    reason=f"Integration test prerequisites not met: {prereq_msg}"
+    not prereq_ok, reason=f"Integration test prerequisites not met: {prereq_msg}"
 )
 
 
@@ -75,6 +74,7 @@ class TestAtlasConnection:
     async def test_vector_index_exists_and_ready(self):
         """Test that vector_index exists and is READY on Atlas."""
         import os
+
         if os.getenv("MONGO_TARGET") != "atlas":
             pytest.skip("vector_index check only runs on Atlas")
 
@@ -111,6 +111,7 @@ class TestAtlasConnection:
     async def test_fulltext_index_exists_and_ready(self):
         """Test that fulltext_index exists and is READY on Atlas."""
         import os
+
         if os.getenv("MONGO_TARGET") != "atlas":
             pytest.skip("fulltext_index check only runs on Atlas")
 
@@ -155,10 +156,11 @@ class TestEmbeddingModel:
 
         # Use the model that's actually in the available list
         emb = NVIDIAEmbeddings(model="nvidia/llama-nemotron-embed-1b-v2")
-        available = [getattr(m, 'id', str(m)) for m in emb.available_models]
+        available = [getattr(m, "id", str(m)) for m in emb.available_models]
 
-        assert "nvidia/llama-nemotron-embed-1b-v2" in available, \
-            f"Model nvidia/llama-nemotron-embed-1b-v2 not in available models: {available}"
+        assert (
+            "nvidia/llama-nemotron-embed-1b-v2" in available
+        ), f"Model nvidia/llama-nemotron-embed-1b-v2 not in available models: {available}"
 
     def test_embedding_generation(self):
         """Test generating embeddings with the configured model."""
@@ -185,16 +187,19 @@ class TestEndToEndRAG:
     def setup_client(self):
         """Setup MongoDB client and repositories."""
         import pytest
-        pytest.skip("TestEndToEndRAG tests require Atlas target due to event loop isolation issues with local MongoDB")
+
+        pytest.skip(
+            "TestEndToEndRAG tests require Atlas target due to event loop isolation issues with local MongoDB"
+        )
         yield None, None
 
     async def test_document_upload_and_ingest(self, setup_client):
         """Test document upload and ingestion pipeline."""
-        from nim_sentinel.rag.ingestion.pipeline import IngestionPipeline
-        from nim_sentinel.rag.ingestion.parsers import TextParser
-        from nim_sentinel.rag.ingestion.cleaner import TextCleaner
         from nim_sentinel.rag.ingestion.chunker import SemanticChunker
+        from nim_sentinel.rag.ingestion.cleaner import TextCleaner
         from nim_sentinel.rag.ingestion.embedder import NVIDIAEmbedder
+        from nim_sentinel.rag.ingestion.parsers import TextParser
+        from nim_sentinel.rag.ingestion.pipeline import IngestionPipeline
 
         doc_repo, chunk_repo = setup_client
 
@@ -216,7 +221,7 @@ class TestEndToEndRAG:
             filename="test_nim_sentinel.txt",
             content_type="text/plain",
             content_hash="test_hash_123",
-            metadata={"source": "integration_test"}
+            metadata={"source": "integration_test"},
         )
 
         # Run ingestion pipeline
@@ -238,7 +243,7 @@ class TestEndToEndRAG:
             content=test_content,
             document_id=doc.id,
             tenant_id="test_tenant",
-            metadata={"source": "integration_test"}
+            metadata={"source": "integration_test"},
         )
 
         assert result.chunks_created > 0, "No chunks created"
@@ -250,16 +255,17 @@ class TestEndToEndRAG:
 
         for chunk in chunks:
             assert chunk.embedding is not None, "Chunk missing embedding"
-            assert len(chunk.embedding) == 1024, f"Wrong embedding dimension: {len(chunk.embedding)}"
+            assert (
+                len(chunk.embedding) == 1024
+            ), f"Wrong embedding dimension: {len(chunk.embedding)}"
             assert chunk.embedding_model == "nvidia/llama-nemotron-embed-1b-v2"
 
         print(f"Created {result.chunks_created} chunks with embeddings")
 
     async def test_hybrid_retrieval_with_citations(self, setup_client):
         """Test hybrid retrieval (vector + fulltext) with citations."""
-        from nim_sentinel.rag.retriever import HybridRetriever
         from nim_sentinel.rag.ingestion.embedder import NVIDIAEmbedder
-        from nim_sentinel.db.repositories import get_chunk_repository
+        from nim_sentinel.rag.retriever import HybridRetriever
 
         doc_repo, chunk_repo = setup_client
 
@@ -271,14 +277,14 @@ class TestEndToEndRAG:
             filename="test_retrieval.txt",
             content_type="text/plain",
             content_hash="test_hash_456",
-            metadata={"source": "integration_test"}
+            metadata={"source": "integration_test"},
         )
 
         # Ingest
-        from nim_sentinel.rag.ingestion.pipeline import IngestionPipeline
-        from nim_sentinel.rag.ingestion.parsers import TextParser
-        from nim_sentinel.rag.ingestion.cleaner import TextCleaner
         from nim_sentinel.rag.ingestion.chunker import SemanticChunker
+        from nim_sentinel.rag.ingestion.cleaner import TextCleaner
+        from nim_sentinel.rag.ingestion.parsers import TextParser
+        from nim_sentinel.rag.ingestion.pipeline import IngestionPipeline
 
         parser = TextParser()
         cleaner = TextCleaner()
@@ -298,7 +304,7 @@ class TestEndToEndRAG:
             content=test_content,
             document_id=doc.id,
             tenant_id="test_tenant",
-            metadata={"source": "integration_test"}
+            metadata={"source": "integration_test"},
         )
 
         # Now test retrieval
@@ -319,16 +325,18 @@ class TestEndToEndRAG:
 
         # Verify results have citations
         for result in results:
-            assert hasattr(result, 'content'), "Result missing content"
-            assert hasattr(result, 'score'), "Result missing score"
-            assert hasattr(result, 'metadata'), "Result missing metadata"
-            assert 'document_id' in result.metadata, "Result missing document_id citation"
-            assert 'chunk_id' in result.metadata, "Result missing chunk_id citation"
+            assert hasattr(result, "content"), "Result missing content"
+            assert hasattr(result, "score"), "Result missing score"
+            assert hasattr(result, "metadata"), "Result missing metadata"
+            assert "document_id" in result.metadata, "Result missing document_id citation"
+            assert "chunk_id" in result.metadata, "Result missing chunk_id citation"
             assert result.score > 0, "Result score should be positive"
 
         print(f"Retrieved {len(results)} results with citations")
         for r in results:
-            print(f"  Score: {r.score:.4f}, Doc: {r.metadata.get('document_id')}, Chunk: {r.metadata.get('chunk_id')}")
+            print(
+                f"  Score: {r.score:.4f}, Doc: {r.metadata.get('document_id')}, Chunk: {r.metadata.get('chunk_id')}"
+            )
 
     async def test_vector_search_executes_on_atlas(self, setup_client):
         """Test that $vectorSearch aggregation runs on Atlas and returns scores."""
@@ -344,14 +352,14 @@ class TestEndToEndRAG:
             filename="test_vector_search.txt",
             content_type="text/plain",
             content_hash="test_hash_789",
-            metadata={"source": "integration_test"}
+            metadata={"source": "integration_test"},
         )
 
         # Ingest
-        from nim_sentinel.rag.ingestion.pipeline import IngestionPipeline
-        from nim_sentinel.rag.ingestion.parsers import TextParser
-        from nim_sentinel.rag.ingestion.cleaner import TextCleaner
         from nim_sentinel.rag.ingestion.chunker import SemanticChunker
+        from nim_sentinel.rag.ingestion.cleaner import TextCleaner
+        from nim_sentinel.rag.ingestion.parsers import TextParser
+        from nim_sentinel.rag.ingestion.pipeline import IngestionPipeline
 
         parser = TextParser()
         cleaner = TextCleaner()
@@ -371,7 +379,7 @@ class TestEndToEndRAG:
             content=test_content,
             document_id=doc.id,
             tenant_id="test_tenant",
-            metadata={"source": "integration_test"}
+            metadata={"source": "integration_test"},
         )
 
         # Get embedding for query
@@ -389,7 +397,7 @@ class TestEndToEndRAG:
                     "queryVector": query_embedding,
                     "numCandidates": 50,
                     "limit": 5,
-                    "filter": {"tenant_id": "test_tenant"}
+                    "filter": {"tenant_id": "test_tenant"},
                 }
             },
             {
@@ -397,9 +405,9 @@ class TestEndToEndRAG:
                     "content": 1,
                     "tenant_id": 1,
                     "document_id": 1,
-                    "score": {"$meta": "vectorSearchScore"}
+                    "score": {"$meta": "vectorSearchScore"},
                 }
-            }
+            },
         ]
 
         results = await client.database.chunks.aggregate(pipeline_stages).to_list(length=5)
@@ -411,7 +419,9 @@ class TestEndToEndRAG:
             assert "score" in result, "Result missing vectorSearchScore"
             assert isinstance(result["score"], (int, float)), "Score should be numeric"
             assert result["score"] > 0, "Score should be positive"
-            print(f"$vectorSearch result: score={result['score']:.4f}, doc_id={result.get('document_id')}")
+            print(
+                f"$vectorSearch result: score={result['score']:.4f}, doc_id={result.get('document_id')}"
+            )
 
         await client.disconnect()
 
@@ -424,13 +434,16 @@ class TestAPIEndpoints:
         """Test that dev JWT token can be generated."""
         from nim_sentinel.core.security import create_dev_token
 
-        token = create_dev_token(tenant_id="test_tenant", permissions=["read", "write"], roles=["analyst"])
+        token = create_dev_token(
+            tenant_id="test_tenant", permissions=["read", "write"], roles=["analyst"]
+        )
 
         assert isinstance(token, str)
         assert len(token) > 0
 
         # Verify token can be decoded
         from nim_sentinel.core.security import decode_token
+
         payload = decode_token(token)
 
         assert payload.tenant_id == "test_tenant"
@@ -439,10 +452,11 @@ class TestAPIEndpoints:
 
     async def test_document_upload_endpoint(self):
         """Test /v1/documents upload endpoint."""
-        from fastapi.testclient import TestClient
-        from nim_sentinel.main import app
-        from nim_sentinel.core.security import create_dev_token
         import time
+
+        from fastapi.testclient import TestClient
+        from nim_sentinel.core.security import create_dev_token
+        from nim_sentinel.main import app
 
         client = TestClient(app)
         token = create_dev_token(tenant_id="test_tenant", permissions=["write"])
@@ -466,8 +480,8 @@ class TestAPIEndpoints:
     async def test_query_endpoint(self):
         """Test /v1/query endpoint with citations."""
         from fastapi.testclient import TestClient
-        from nim_sentinel.main import app
         from nim_sentinel.core.security import create_dev_token
+        from nim_sentinel.main import app
 
         client = TestClient(app)
         token = create_dev_token(tenant_id="test_tenant", permissions=["read"])

@@ -476,7 +476,9 @@ class TestTrackCostContextManager:
         reset_cost_tracker()
         try:
             with pytest.raises(ValueError):
-                async with track_cost(ModelRole.GENERATOR_LLM, "meta/llama-3.1-8b-instruct") as result:
+                async with track_cost(
+                    ModelRole.GENERATOR_LLM, "meta/llama-3.1-8b-instruct"
+                ) as result:
                     result["tokens_in"] = 100
                     result["tokens_out"] = 50
                     raise ValueError("Test error")

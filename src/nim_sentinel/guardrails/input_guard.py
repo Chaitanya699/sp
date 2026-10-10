@@ -9,20 +9,19 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from nim_sentinel.guardrails.groundedness import GroundednessResult
 from nim_sentinel.guardrails.jailbreak import detect_all_heuristic
 from nim_sentinel.guardrails.nemoguard import (
     NemoGuardClient,
-    NemoGuardResult,
     get_nemo_guard_client,
 )
-from nim_sentinel.guardrails.pii import detect_pii, redact_pii, PIIResult
+from nim_sentinel.guardrails.pii import detect_pii, redact_pii
 
 logger = logging.getLogger(__name__)
 
 
 class GuardAction(StrEnum):
     """Action to take when guardrail triggers."""
+
     ALLOW = "allow"
     BLOCK = "block"
     REDACT = "redact"
@@ -31,6 +30,7 @@ class GuardAction(StrEnum):
 
 class GuardCategory(StrEnum):
     """Categories of guardrail checks."""
+
     JAILBREAK = "jailbreak"
     INJECTION = "injection"
     CONTENT_SAFETY = "content_safety"
@@ -41,6 +41,7 @@ class GuardCategory(StrEnum):
 @dataclass
 class GuardResult:
     """Result of a guardrail check."""
+
     category: GuardCategory
     action: GuardAction
     triggered: bool
@@ -62,6 +63,7 @@ class GuardResult:
 @dataclass
 class GuardrailResponse:
     """Combined response from multiple guardrails."""
+
     allowed: bool
     results: list[GuardResult]
     modified_content: str | None = None
@@ -108,43 +110,49 @@ class InputGuardrails:
         heuristic_result = detect_all_heuristic(text)
 
         if heuristic_result["jailbreak"]["triggered"]:
-            results.append(GuardResult(
-                category=GuardCategory.JAILBREAK,
-                action=GuardAction.BLOCK,
-                triggered=True,
-                details={
-                    "type": heuristic_result["jailbreak"]["type"],
-                    "matched": heuristic_result["jailbreak"]["matched"],
-                },
-                confidence=heuristic_result["jailbreak"]["confidence"],
-                source="heuristic",
-            ))
+            results.append(
+                GuardResult(
+                    category=GuardCategory.JAILBREAK,
+                    action=GuardAction.BLOCK,
+                    triggered=True,
+                    details={
+                        "type": heuristic_result["jailbreak"]["type"],
+                        "matched": heuristic_result["jailbreak"]["matched"],
+                    },
+                    confidence=heuristic_result["jailbreak"]["confidence"],
+                    source="heuristic",
+                )
+            )
 
         if heuristic_result["injection"]["triggered"]:
-            results.append(GuardResult(
-                category=GuardCategory.INJECTION,
-                action=GuardAction.BLOCK,
-                triggered=True,
-                details={
-                    "type": heuristic_result["injection"]["type"],
-                    "matched": heuristic_result["injection"]["matched"],
-                },
-                confidence=heuristic_result["injection"]["confidence"],
-                source="heuristic",
-            ))
+            results.append(
+                GuardResult(
+                    category=GuardCategory.INJECTION,
+                    action=GuardAction.BLOCK,
+                    triggered=True,
+                    details={
+                        "type": heuristic_result["injection"]["type"],
+                        "matched": heuristic_result["injection"]["matched"],
+                    },
+                    confidence=heuristic_result["injection"]["confidence"],
+                    source="heuristic",
+                )
+            )
 
         # PII
         pii_results = detect_pii(text)
         if pii_results:
             pii_details = {r.pii_type: r.count for r in pii_results}
-            results.append(GuardResult(
-                category=GuardCategory.PII,
-                action=GuardAction.REDACT,
-                triggered=True,
-                details={"findings": pii_details},
-                confidence=0.95,
-                source="heuristic",
-            ))
+            results.append(
+                GuardResult(
+                    category=GuardCategory.PII,
+                    action=GuardAction.REDACT,
+                    triggered=True,
+                    details={"findings": pii_details},
+                    confidence=0.95,
+                    source="heuristic",
+                )
+            )
 
         return results
 
@@ -159,65 +167,77 @@ class InputGuardrails:
         # Content safety
         cs = nemo_results["content_safety"]
         if cs.triggered:
-            results.append(GuardResult(
-                category=GuardCategory.CONTENT_SAFETY,
-                action=GuardAction.BLOCK,
-                triggered=True,
-                details={"nemo_category": cs.category},
-                confidence=cs.confidence,
-                source="nemoguard",
-            ))
+            results.append(
+                GuardResult(
+                    category=GuardCategory.CONTENT_SAFETY,
+                    action=GuardAction.BLOCK,
+                    triggered=True,
+                    details={"nemo_category": cs.category},
+                    confidence=cs.confidence,
+                    source="nemoguard",
+                )
+            )
         elif not cs.available:
-            results.append(GuardResult(
-                category=GuardCategory.CONTENT_SAFETY,
-                action=GuardAction.ALLOW,
-                triggered=False,
-                details={"error": cs.error, "available": False},
-                confidence=0.0,
-                source="nemoguard",
-            ))
+            results.append(
+                GuardResult(
+                    category=GuardCategory.CONTENT_SAFETY,
+                    action=GuardAction.ALLOW,
+                    triggered=False,
+                    details={"error": cs.error, "available": False},
+                    confidence=0.0,
+                    source="nemoguard",
+                )
+            )
 
         # Jailbreak
         jb = nemo_results["jailbreak"]
         if jb.triggered:
-            results.append(GuardResult(
-                category=GuardCategory.JAILBREAK,
-                action=GuardAction.BLOCK,
-                triggered=True,
-                details={"nemo_type": jb.category},
-                confidence=jb.confidence,
-                source="nemoguard",
-            ))
+            results.append(
+                GuardResult(
+                    category=GuardCategory.JAILBREAK,
+                    action=GuardAction.BLOCK,
+                    triggered=True,
+                    details={"nemo_type": jb.category},
+                    confidence=jb.confidence,
+                    source="nemoguard",
+                )
+            )
         elif not jb.available:
-            results.append(GuardResult(
-                category=GuardCategory.JAILBREAK,
-                action=GuardAction.ALLOW,
-                triggered=False,
-                details={"error": jb.error, "available": False},
-                confidence=0.0,
-                source="nemoguard",
-            ))
+            results.append(
+                GuardResult(
+                    category=GuardCategory.JAILBREAK,
+                    action=GuardAction.ALLOW,
+                    triggered=False,
+                    details={"error": jb.error, "available": False},
+                    confidence=0.0,
+                    source="nemoguard",
+                )
+            )
 
         # Topic
         topic = nemo_results["topic"]
         if topic.triggered:
-            results.append(GuardResult(
-                category=GuardCategory.TOPIC_CONTROL,
-                action=GuardAction.FLAG,
-                triggered=True,
-                details={"reason": topic.category},
-                confidence=topic.confidence,
-                source="nemoguard",
-            ))
+            results.append(
+                GuardResult(
+                    category=GuardCategory.TOPIC_CONTROL,
+                    action=GuardAction.FLAG,
+                    triggered=True,
+                    details={"reason": topic.category},
+                    confidence=topic.confidence,
+                    source="nemoguard",
+                )
+            )
         elif not topic.available:
-            results.append(GuardResult(
-                category=GuardCategory.TOPIC_CONTROL,
-                action=GuardAction.ALLOW,
-                triggered=False,
-                details={"error": topic.error, "available": False},
-                confidence=0.0,
-                source="nemoguard",
-            ))
+            results.append(
+                GuardResult(
+                    category=GuardCategory.TOPIC_CONTROL,
+                    action=GuardAction.ALLOW,
+                    triggered=False,
+                    details={"error": topic.error, "available": False},
+                    confidence=0.0,
+                    source="nemoguard",
+                )
+            )
 
         return results
 

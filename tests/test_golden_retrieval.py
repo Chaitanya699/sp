@@ -5,9 +5,10 @@ Evaluates retrieval quality using recall@k and MRR metrics.
 """
 
 import pytest
-from nim_sentinel.rag.retriever import HybridRetriever, RetrievalResult
 from nim_sentinel.db.repositories import ChunkRepository
-from tests.golden_retrieval_dataset import get_golden_retrieval_examples, RetrievalGoldenExample
+from nim_sentinel.rag.retriever import HybridRetriever, RetrievalResult
+
+from tests.golden_retrieval_dataset import get_golden_retrieval_examples
 
 
 class TestGoldenRetrievalDataset:
@@ -17,14 +18,15 @@ class TestGoldenRetrievalDataset:
     def mock_chunk_repo(self):
         """Create a mock ChunkRepository with test data."""
         from unittest.mock import AsyncMock
+
         repo = AsyncMock(spec=ChunkRepository)
         return repo
 
     @pytest.fixture
     def retriever(self, mock_chunk_repo):
         """Create a HybridRetriever with mocked dependencies."""
-        from unittest.mock import patch, AsyncMock
-        from langchain_core.documents import Document
+        from unittest.mock import patch
+
 
         with patch("nim_sentinel.rag.retriever.get_settings") as mock_settings:
             mock_settings.return_value.embedding_model = "nvidia/nemotron-3-embed-1b"
@@ -60,6 +62,7 @@ class TestGoldenRetrievalDataset:
     async def test_golden_retrieval_recall_at_k(self, retriever, mock_chunk_repo):
         """Test recall@k for golden retrieval dataset."""
         from unittest.mock import AsyncMock, patch
+
         from langchain_core.documents import Document
 
         examples = get_golden_retrieval_examples()
@@ -70,14 +73,17 @@ class TestGoldenRetrievalDataset:
         for example in examples:
             # Setup mock results - simulate retrieval returning relevant docs at various positions
             # For testing, we'll create results where relevant docs appear in top positions
-            relevant_docs = set(zip(example.relevant_doc_ids, example.relevant_chunk_indices))
+            relevant_docs = set(zip(example.relevant_doc_ids, example.relevant_chunk_indices, strict=False))
 
             # Create mock results with relevant docs at top
             mock_vector_results = self._create_mock_results(
                 doc_ids=example.relevant_doc_ids + ["other_doc1", "other_doc2"],
                 chunk_indices=example.relevant_chunk_indices + [0, 0],
-                contents=["Relevant content about " + example.query] * len(example.relevant_doc_ids) + ["Irrelevant content", "More irrelevant"],
-                scores=[0.95, 0.90] + [0.5, 0.4] if len(example.relevant_doc_ids) >= 2 else [0.95] + [0.5, 0.4]
+                contents=["Relevant content about " + example.query] * len(example.relevant_doc_ids)
+                + ["Irrelevant content", "More irrelevant"],
+                scores=[0.95, 0.90] + [0.5, 0.4]
+                if len(example.relevant_doc_ids) >= 2
+                else [0.95] + [0.5, 0.4],
             )
             mock_text_results = []
 
@@ -88,8 +94,10 @@ class TestGoldenRetrievalDataset:
                 mock_reranker = AsyncMock()
                 # Reranker returns same order (relevant docs first)
                 mock_reranker.acompress_documents.return_value = [
-                    Document(page_content=r["content"], metadata={"relevance_score": r["score"], **r})
-                    for r in mock_vector_results[:retriever.final_top_k]
+                    Document(
+                        page_content=r["content"], metadata={"relevance_score": r["score"], **r}
+                    )
+                    for r in mock_vector_results[: retriever.final_top_k]
                 ]
                 mock_get_reranker.return_value = mock_reranker
 
@@ -118,7 +126,7 @@ class TestGoldenRetrievalDataset:
 
         # Print summary
         print(f"\n{'='*60}")
-        print(f"GOLDEN RETRIEVAL DATASET EVALUATION")
+        print("GOLDEN RETRIEVAL DATASET EVALUATION")
         print(f"{'='*60}")
         print(f"Total examples: {len(examples)}")
 
@@ -149,6 +157,7 @@ class TestGoldenRetrievalDataset:
     async def test_retrieval_returns_citations(self, retriever, mock_chunk_repo):
         """Test that retrieval results include proper citation metadata."""
         from unittest.mock import AsyncMock, patch
+
         from langchain_core.documents import Document
 
         mock_chunk_repo.vector_search.return_value = [
@@ -166,7 +175,9 @@ class TestGoldenRetrievalDataset:
         with patch.object(retriever, "_get_reranker") as mock_get_reranker:
             mock_reranker = AsyncMock()
             mock_reranker.acompress_documents.return_value = [
-                Document(page_content="Test content for citation", metadata={"relevance_score": 0.95})
+                Document(
+                    page_content="Test content for citation", metadata={"relevance_score": 0.95}
+                )
             ]
             mock_get_reranker.return_value = mock_reranker
 

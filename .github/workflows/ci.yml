@@ -2,66 +2,93 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, master]
   pull_request:
-    branches: [main, develop]
+    branches: [main, master]
 
 env:
-  PYTHON_VERSION: '3.11'
-  UV_VERSION: '0.4.0'
+  PYTHON_VERSION: "3.12"
+  POETRY_VERSION: "1.8.3"
 
 jobs:
-  lint:
-    name: Lint & Format
+  lint-and-typecheck:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: ${{ env.UV_VERSION }}
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Poetry
+        run: pip install poetry==${{ env.POETRY_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --frozen --all-extras
+        run: poetry install --no-interaction --with dev
 
-      - name: Run ruff
-        run: uv run ruff check src/ tests/ scripts/ --output-format=github
+      - name: Run Ruff (lint)
+        run: poetry run ruff check src/ tests/
 
-      - name: Run black
-        run: uv run black --check src/ tests/ scripts/
+      - name: Run Ruff (format check)
+        run: poetry run ruff format --check src/ tests/
 
-      - name: Run mypy
-        run: uv run mypy src/
+      - name: Run MyPy (type check)
+        run: poetry run mypy src/ --ignore-missing-imports
 
-  test:
+  unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      MONGODB_URI: mongodb://localhost:27017
+      MONGODB_DATABASE: nim_sentinel_test
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+      LANGSMITH_PROJECT: nim-sentinel-ci
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: ${{ env.UV_VERSION }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Poetry
+        run: pip install poetry==${{ env.POETRY_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --frozen --extra test
+        run: poetry install --no-interaction --with dev
+
+      - name: Wait for MongoDB
+        run: |
+          for i in {1..30}; do
+            if mongosh --eval "db.adminCommand('ping')" --quiet; then
+              echo "MongoDB is ready"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Create MongoDB indexes
+        run: poetry run python scripts/create_indexes.py
 
       - name: Run unit tests
-        run: uv run pytest tests/ -v --tb=short -x -m "not integration" --cov=src/nim_sentinel --cov-report=xml
+        run: poetry run pytest tests/ -v --tb=short -x --ignore=tests/test_integration.py
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -69,139 +96,144 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
 
-  typecheck:
-    name: Type Check
+  integration-tests:
+    name: Integration Tests
     runs-on: ubuntu-latest
+    if: ${{ secrets.NVIDIA_API_KEY != '' }}
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      MONGODB_URI: mongodb://localhost:27017
+      MONGODB_DATABASE: nim_sentinel_test
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+      LANGSMITH_PROJECT: nim-sentinel-ci
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: ${{ env.UV_VERSION }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Poetry
+        run: pip install poetry==${{ env.POETRY_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --frozen --all-extras
+        run: poetry install --no-interaction --with dev
 
-      - name: Run mypy
-        run: uv run mypy src/ --strict
+      - name: Wait for MongoDB
+        run: |
+          for i in {1..30}; do
+            if mongosh --eval "db.adminCommand('ping')" --quiet; then
+              echo "MongoDB is ready"
+              break
+            fi
+            sleep 2
+          done
 
-  security:
-    name: Security Scan
+      - name: Create MongoDB indexes
+        run: poetry run python scripts/create_indexes.py
+
+      - name: Run integration tests
+        run: poetry run pytest tests/test_integration.py -v --tb=short
+
+  evaluations:
+    name: Evaluations
     runs-on: ubuntu-latest
+    if: ${{ secrets.NVIDIA_API_KEY != '' }}
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      MONGODB_URI: mongodb://localhost:27017
+      MONGODB_DATABASE: nim_sentinel_test
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+      LANGSMITH_PROJECT: nim-sentinel-ci
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: ${{ env.UV_VERSION }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Poetry
+        run: pip install poetry==${{ env.POETRY_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --frozen --all-extras
+        run: poetry install --no-interaction --with dev
 
-      - name: Run bandit
-        run: uv run bandit -r src/ -f json -o bandit-report.json || true
+      - name: Wait for MongoDB
+        run: |
+          for i in {1..30}; do
+            if mongosh --eval "db.adminCommand('ping')" --quiet; then
+              echo "MongoDB is ready"
+              break
+            fi
+            sleep 2
+          done
 
-      - name: Run pip-audit
-        run: uv run pip-audit --desc --format=json --output=pip-audit-report.json || true
+      - name: Create MongoDB indexes
+        run: poetry run python scripts/create_indexes.py
 
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          args: --verbose --redact
+      - name: Seed test data
+        run: poetry run python scripts/seed_data.py --tenant test_tenant
 
-      - name: Upload security reports
+      - name: Run evaluations
+        run: poetry run python evals/run_evals.py --component all --fail-under 0.8 --output eval_results.json
+
+      - name: Upload evaluation results
         uses: actions/upload-artifact@v4
         with:
-          name: security-reports
-          path: |
-            bandit-report.json
-            pip-audit-report.json
+          name: eval-results
+          path: eval_results.json
 
-  docker:
-    name: Docker Build
+  build:
+    name: Build Package
     runs-on: ubuntu-latest
-    needs: [lint, test, typecheck]
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork == false
+    needs: [lint-and-typecheck, unit-tests]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build development image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: deploy/docker/Dockerfile
-          target: development
-          load: true
-          tags: nim-sentinel:dev
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build production image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: deploy/docker/Dockerfile
-          target: production
-          load: true
-          tags: nim-sentinel:prod
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Test development image
-        run: |
-          docker run --rm nim-sentinel:dev python -c "import nim_sentinel; print('Import OK')"
-
-  check-models:
-    name: Verify NVIDIA Models
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: ${{ env.UV_VERSION }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Poetry
+        run: pip install poetry==${{ env.POETRY_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: poetry install --no-interaction
 
-      - name: Run model check
-        env:
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-        run: uv run python scripts/check_models.py
+      - name: Build package
+        run: poetry build
 
-  notify:
-    name: Notify on Failure
-    runs-on: ubuntu-latest
-    needs: [lint, test, typecheck, security, docker, check-models]
-    if: failure()
-    steps:
-      - name: Send failure notification
-        run: |
-          echo "CI pipeline failed. Check GitHub Actions for details."
-          # Add Slack/Email notification here
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

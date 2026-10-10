@@ -29,6 +29,7 @@ logger = get_logger(__name__)
 @dataclass
 class RivaConfig:
     """Configuration for Riva gRPC connection."""
+
     uri: str = "localhost:50051"
     use_ssl: bool = False
     ssl_root_cert: str | None = None
@@ -156,9 +157,11 @@ class RivaASRAdapter:
             assert self._service is not None
             responses = await loop.run_in_executor(
                 None,
-                lambda: list(self._service.streaming_response_generator(  # type: ignore[union-attr]
-                    chunk_generator(), streaming_config
-                ))
+                lambda: list(
+                    self._service.streaming_response_generator(  # type: ignore[union-attr]
+                        chunk_generator(), streaming_config
+                    )
+                ),
             )
 
             for response in responses:
@@ -303,13 +306,15 @@ class RivaTTSAdapter:
             assert self._service is not None
             responses = await loop.run_in_executor(
                 None,
-                lambda: list(self._service.synthesize_online(  # type: ignore[union-attr]
-                    text=text,
-                    voice_name=voice_name,
-                    language_code=language_code or self.config.language_code,
-                    encoding=audio_encoding or self.config.audio_encoding,
-                    sample_rate_hz=sample_rate_hz or self.config.sample_rate_hz,
-                ))
+                lambda: list(
+                    self._service.synthesize_online(  # type: ignore[union-attr]
+                        text=text,
+                        voice_name=voice_name,
+                        language_code=language_code or self.config.language_code,
+                        encoding=audio_encoding or self.config.audio_encoding,
+                        sample_rate_hz=sample_rate_hz or self.config.sample_rate_hz,
+                    )
+                ),
             )
 
             for response in responses:
@@ -346,6 +351,7 @@ class RivaTTSAdapter:
         )
 
         import wave
+
         with wave.open(str(output_path), "wb") as wav_file:
             wav_file.setnchannels(1)
             wav_file.setsampwidth(2)  # 16-bit
@@ -395,4 +401,3 @@ def reset_riva_adapters() -> None:
     global _asr_adapter, _tts_adapter
     _asr_adapter = None
     _tts_adapter = None
-

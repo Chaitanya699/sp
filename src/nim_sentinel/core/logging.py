@@ -8,9 +8,10 @@ import logging
 import logging.config
 import re
 import uuid
+from collections.abc import Mapping, MutableMapping
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Callable, Mapping, MutableMapping
+from typing import Any
 
 import structlog
 import yaml
@@ -52,8 +53,7 @@ class PIIRedactionFilter(logging.Filter):
         # Redact from args
         if record.args:
             record.args = tuple(
-                self._redact(arg) if isinstance(arg, str) else arg
-                for arg in record.args
+                self._redact(arg) if isinstance(arg, str) else arg for arg in record.args
             )
 
         return True
@@ -94,6 +94,7 @@ def add_correlation_id(
 def hash_user_id(user_id: str) -> str:
     """Hash user ID for privacy-preserving logging."""
     import hashlib
+
     return hashlib.sha256(user_id.encode()).hexdigest()[:16]
 
 
@@ -126,7 +127,9 @@ def setup_logging(config_path: str | None = None) -> None:
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
             add_correlation_id,
-            structlog.processors.JSONRenderer() if settings.log_format == "json" else structlog.dev.ConsoleRenderer(),  # type: ignore[list-item]
+            structlog.processors.JSONRenderer()
+            if settings.log_format == "json"
+            else structlog.dev.ConsoleRenderer(),  # type: ignore[list-item]
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),

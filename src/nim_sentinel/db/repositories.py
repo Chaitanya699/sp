@@ -63,12 +63,22 @@ class BaseRepository(ABC):
         if self.indexes:
             try:
                 await self._collection.create_indexes(self.indexes)
-                logger.info("Indexes created", extra={"collection": self.collection_name, "tenant_id": self._tenant_id})
+                logger.info(
+                    "Indexes created",
+                    extra={"collection": self.collection_name, "tenant_id": self._tenant_id},
+                )
             except OperationFailure as e:
-                logger.error("Failed to create indexes", extra={"collection": self.collection_name, "error": str(e)})
-                raise DatabaseError(f"Failed to create indexes: {e}", operation="create_indexes") from e
+                logger.error(
+                    "Failed to create indexes",
+                    extra={"collection": self.collection_name, "error": str(e)},
+                )
+                raise DatabaseError(
+                    f"Failed to create indexes: {e}", operation="create_indexes"
+                ) from e
 
-    async def find_one(self, query: dict[str, Any], projection: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    async def find_one(
+        self, query: dict[str, Any], projection: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         """Find single document with tenant isolation."""
         filtered_query = self._add_tenant_filter(query)
         result = await self._collection.find_one(filtered_query, projection=projection)
@@ -199,11 +209,13 @@ class DocumentRepository(BaseRepository):
     async def get_document(self, document_id: str) -> dict[str, Any] | None:
         """Get document by ID."""
         from bson import ObjectId
+
         return await self.find_one({"_id": ObjectId(document_id)})
 
     async def update_status(self, document_id: str, status: str, error: str | None = None) -> bool:
         """Update document processing status."""
         from bson import ObjectId
+
         update = {"status": status}
         if error:
             update["error"] = error
@@ -212,6 +224,7 @@ class DocumentRepository(BaseRepository):
     async def update_stats(self, document_id: str, chunk_count: int, token_count: int) -> bool:
         """Update document chunk and token counts."""
         from bson import ObjectId
+
         return await self.update_one(
             {"_id": ObjectId(document_id)},
             {"chunk_count": chunk_count, "token_count": token_count},
@@ -248,7 +261,9 @@ class ChunkRepository(BaseRepository):
     collection_name = COLLECTION_CHUNKS
     indexes = [
         IndexModel([("tenant_id", ASCENDING), ("document_id", ASCENDING)]),
-        IndexModel([("tenant_id", ASCENDING), ("document_id", ASCENDING), ("chunk_index", ASCENDING)]),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("document_id", ASCENDING), ("chunk_index", ASCENDING)]
+        ),
         IndexModel([("tenant_id", ASCENDING), ("embedding_model", ASCENDING)]),
         # Vector search index created separately via create_indexes.py
     ]
@@ -279,6 +294,7 @@ class ChunkRepository(BaseRepository):
     async def get_chunks_by_document(self, document_id: str) -> list[dict[str, Any]]:
         """Get all chunks for a document."""
         from bson import ObjectId
+
         return await self.find_many(
             {"document_id": ObjectId(document_id)},
             sort=[("chunk_index", ASCENDING)],
@@ -287,6 +303,7 @@ class ChunkRepository(BaseRepository):
     async def get_chunk(self, chunk_id: str) -> dict[str, Any] | None:
         """Get chunk by ID."""
         from bson import ObjectId
+
         return await self.find_one({"_id": ObjectId(chunk_id)})
 
     async def update_embeddings(self, chunk_ids: list[str], embeddings: list[list[float]]) -> int:
@@ -344,9 +361,15 @@ class ChunkRepository(BaseRepository):
         try:
             return await self.aggregate(pipeline)
         except OperationFailure as e:
-            if "vectorSearch" in str(e) or "SearchNotEnabled" in str(e) or "CommandNotFound" in str(e):
+            if (
+                "vectorSearch" in str(e)
+                or "SearchNotEnabled" in str(e)
+                or "CommandNotFound" in str(e)
+            ):
                 # Fallback to manual cosine similarity for local MongoDB
-                return await self._manual_vector_search(query_embedding, embedding_model, top_k, filter_query)
+                return await self._manual_vector_search(
+                    query_embedding, embedding_model, top_k, filter_query
+                )
             raise
 
     async def _manual_vector_search(
@@ -367,14 +390,17 @@ class ChunkRepository(BaseRepository):
         filter_dict["embedding"] = {"$exists": True, "$ne": None}
 
         # Fetch all chunks with embeddings
-        cursor = self._collection.find(filter_dict, projection={
-            "content": 1,
-            "document_id": 1,
-            "chunk_index": 1,
-            "metadata": 1,
-            "embedding_model": 1,
-            "embedding": 1,
-        })
+        cursor = self._collection.find(
+            filter_dict,
+            projection={
+                "content": 1,
+                "document_id": 1,
+                "chunk_index": 1,
+                "metadata": 1,
+                "embedding_model": 1,
+                "embedding": 1,
+            },
+        )
         chunks = await cursor.to_list(length=None)
 
         if not chunks:
@@ -390,15 +416,20 @@ class ChunkRepository(BaseRepository):
                 continue
             chunk_vec = np.array(emb)
             # Cosine similarity
-            sim = float(np.dot(query_vec, chunk_vec) / (np.linalg.norm(query_vec) * np.linalg.norm(chunk_vec)))
-            results.append({
-                "content": chunk["content"],
-                "document_id": chunk["document_id"],
-                "chunk_index": chunk["chunk_index"],
-                "metadata": chunk.get("metadata", {}),
-                "embedding_model": chunk.get("embedding_model", embedding_model),
-                "score": sim,
-            })
+            sim = float(
+                np.dot(query_vec, chunk_vec)
+                / (np.linalg.norm(query_vec) * np.linalg.norm(chunk_vec))
+            )
+            results.append(
+                {
+                    "content": chunk["content"],
+                    "document_id": chunk["document_id"],
+                    "chunk_index": chunk["chunk_index"],
+                    "metadata": chunk.get("metadata", {}),
+                    "embedding_model": chunk.get("embedding_model", embedding_model),
+                    "score": sim,
+                }
+            )
 
         # Sort by similarity descending
         results.sort(key=lambda x: x["score"], reverse=True)
@@ -441,7 +472,11 @@ class ChunkRepository(BaseRepository):
         try:
             return await self.aggregate(pipeline)
         except OperationFailure as e:
-            if "search" in str(e).lower() or "SearchNotEnabled" in str(e) or "CommandNotFound" in str(e):
+            if (
+                "search" in str(e).lower()
+                or "SearchNotEnabled" in str(e)
+                or "CommandNotFound" in str(e)
+            ):
                 # Fallback to regex search for local MongoDB
                 return await self._manual_text_search(query, top_k, filter_query)
             raise
@@ -470,13 +505,16 @@ class ChunkRepository(BaseRepository):
         filter_dict["content"] = {"$regex": pattern, "$options": "i"}
 
         # Fetch matching chunks
-        cursor = self._collection.find(filter_dict, projection={
-            "content": 1,
-            "document_id": 1,
-            "chunk_index": 1,
-            "metadata": 1,
-            "embedding_model": 1,
-        }).limit(top_k * 3)  # Get more for scoring
+        cursor = self._collection.find(
+            filter_dict,
+            projection={
+                "content": 1,
+                "document_id": 1,
+                "chunk_index": 1,
+                "metadata": 1,
+                "embedding_model": 1,
+            },
+        ).limit(top_k * 3)  # Get more for scoring
 
         chunks = await cursor.to_list(length=None)
 
@@ -489,14 +527,16 @@ class ChunkRepository(BaseRepository):
             content = chunk["content"].lower()
             score = sum(1 for w in words if w.lower() in content)
             if score > 0:
-                results.append({
-                    "content": chunk["content"],
-                    "document_id": chunk["document_id"],
-                    "chunk_index": chunk["chunk_index"],
-                    "metadata": chunk.get("metadata", {}),
-                    "embedding_model": chunk.get("embedding_model", ""),
-                    "score": float(score),
-                })
+                results.append(
+                    {
+                        "content": chunk["content"],
+                        "document_id": chunk["document_id"],
+                        "chunk_index": chunk["chunk_index"],
+                        "metadata": chunk.get("metadata", {}),
+                        "embedding_model": chunk.get("embedding_model", ""),
+                        "score": float(score),
+                    }
+                )
 
         # Sort by score descending
         results.sort(key=lambda x: x["score"], reverse=True)
@@ -565,6 +605,7 @@ class SessionRepository(BaseRepository):
     async def increment_message_count(self, thread_id: str) -> bool:
         """Increment message count and update last_message_at."""
         from datetime import UTC, datetime
+
         return await self.update_one(
             {"thread_id": thread_id},
             {

@@ -83,9 +83,7 @@ class PDFParser(BaseParser):
 
                 # Extract PDF metadata
                 if reader.metadata:
-                    metadata["pdf_metadata"] = {
-                        k: str(v) for k, v in reader.metadata.items()
-                    }
+                    metadata["pdf_metadata"] = {k: str(v) for k, v in reader.metadata.items()}
 
                 for i, page in enumerate(reader.pages):
                     try:

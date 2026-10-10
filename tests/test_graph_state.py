@@ -2,13 +2,13 @@
 Tests for NIM Sentinel Graph State Module (B1)
 """
 
-import pytest
 from datetime import datetime
-from langchain_core.messages import HumanMessage, AIMessage
+
+from langchain_core.messages import AIMessage, HumanMessage
 from nim_sentinel.graph.state import (
     AgentState,
-    SupervisorDecision,
     CriticOutput,
+    SupervisorDecision,
     create_initial_state,
 )
 

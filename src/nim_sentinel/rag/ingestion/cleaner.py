@@ -46,9 +46,7 @@ def clean_text(text: str, options: dict[str, Any] | None = None) -> str:
 
     # Remove control characters (except newlines and tabs)
     if opts["remove_control_chars"]:
-        text = "".join(
-            ch for ch in text if ch in "\n\t" or unicodedata.category(ch)[0] != "C"
-        )
+        text = "".join(ch for ch in text if ch in "\n\t" or unicodedata.category(ch)[0] != "C")
 
     # Fix hyphenated line breaks (word-\nword -> wordword)
     if opts["fix_hyphenation"]:

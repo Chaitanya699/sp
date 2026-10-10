@@ -6,6 +6,7 @@ Reviews generated answers for quality, accuracy, and citation correctness.
 
 import logging
 from typing import Any
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from nim_sentinel.core.config import get_model_config, get_settings
@@ -73,9 +74,7 @@ If approved is false, the answer will be regenerated with your feedback."""
         # Build context from retrieval results
         context_parts = []
         for i, result in enumerate(state.retrieval_results):
-            context_parts.append(
-                f"[Source {i+1}] {result.content}"
-            )
+            context_parts.append(f"[Source {i+1}] {result.content}")
         context = "\n\n".join(context_parts) if context_parts else "No sources retrieved."
 
         # Build citations summary
@@ -110,6 +109,7 @@ Review this answer and provide your evaluation."""
                 if isinstance(content, list):
                     content = " ".join(str(c) for c in content)
                 import json
+
                 try:
                     result_dict: dict[str, Any] = json.loads(content)
                 except json.JSONDecodeError:

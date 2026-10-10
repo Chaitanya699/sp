@@ -2,10 +2,11 @@
 Tests for NIM Sentinel Graph Critic Module (B4)
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from nim_sentinel.graph.state import AgentState, CriticOutput
 from nim_sentinel.graph.nodes.critic import Critic, critic_node
+from nim_sentinel.graph.state import AgentState, CriticOutput
 
 
 class TestCritic:
@@ -50,8 +51,18 @@ class TestCritic:
             session_id="session_1",
             answer="NIM Sentinel is an enterprise RAG system with NVIDIA NIM integration.",
             citations=[
-                {"document_id": "doc1", "chunk_index": 0, "content": "NIM Sentinel is an enterprise RAG system.", "score": 0.9},
-                {"document_id": "doc2", "chunk_index": 1, "content": "It uses NVIDIA NIM for embeddings.", "score": 0.85},
+                {
+                    "document_id": "doc1",
+                    "chunk_index": 0,
+                    "content": "NIM Sentinel is an enterprise RAG system.",
+                    "score": 0.9,
+                },
+                {
+                    "document_id": "doc2",
+                    "chunk_index": 1,
+                    "content": "It uses NVIDIA NIM for embeddings.",
+                    "score": 0.85,
+                },
             ],
             confidence=0.85,
         )
@@ -69,7 +80,10 @@ class TestCritic:
             "approved": False,
             "feedback": "Answer lacks citations for key claims.",
             "confidence": 0.3,
-            "suggested_changes": ["Add citations for all factual claims", "Reference source documents"]
+            "suggested_changes": [
+                "Add citations for all factual claims",
+                "Reference source documents",
+            ],
         }
 
         state = AgentState(
@@ -95,7 +109,10 @@ class TestCritic:
             "approved": False,
             "feedback": "Answer contains information not supported by citations.",
             "confidence": 0.2,
-            "suggested_changes": ["Remove unsupported claims", "Only use information from provided sources"]
+            "suggested_changes": [
+                "Remove unsupported claims",
+                "Only use information from provided sources",
+            ],
         }
 
         state = AgentState(
@@ -105,7 +122,12 @@ class TestCritic:
             session_id="session_1",
             answer="NIM Sentinel was founded in 2020 by Elon Musk and uses quantum computing.",
             citations=[
-                {"document_id": "doc1", "chunk_index": 0, "content": "NIM Sentinel is an enterprise RAG system.", "score": 0.9},
+                {
+                    "document_id": "doc1",
+                    "chunk_index": 0,
+                    "content": "NIM Sentinel is an enterprise RAG system.",
+                    "score": 0.9,
+                },
             ],
             confidence=0.6,
         )
@@ -123,7 +145,10 @@ class TestCritic:
             "approved": False,
             "feedback": "Answer does not fully address the question.",
             "confidence": 0.4,
-            "suggested_changes": ["Address all parts of the question", "Provide more detail on architecture"]
+            "suggested_changes": [
+                "Address all parts of the question",
+                "Provide more detail on architecture",
+            ],
         }
 
         state = AgentState(
@@ -133,7 +158,12 @@ class TestCritic:
             session_id="session_1",
             answer="NIM Sentinel is a RAG system.",
             citations=[
-                {"document_id": "doc1", "chunk_index": 0, "content": "NIM Sentinel is an enterprise RAG system.", "score": 0.9},
+                {
+                    "document_id": "doc1",
+                    "chunk_index": 0,
+                    "content": "NIM Sentinel is an enterprise RAG system.",
+                    "score": 0.9,
+                },
             ],
             confidence=0.7,
         )
@@ -153,12 +183,14 @@ class TestCriticNode:
         """Test that critic_node updates state when approved."""
         with patch("nim_sentinel.graph.nodes.critic.Critic") as mock_critic_class:
             mock_critic = AsyncMock()
-            mock_critic.review = AsyncMock(return_value=CriticOutput(
-                approved=True,
-                feedback="Answer is accurate and well-cited",
-                confidence=0.95,
-                suggested_changes=[],
-            ))
+            mock_critic.review = AsyncMock(
+                return_value=CriticOutput(
+                    approved=True,
+                    feedback="Answer is accurate and well-cited",
+                    confidence=0.95,
+                    suggested_changes=[],
+                )
+            )
             mock_critic_class.return_value = mock_critic
 
             state = AgentState(
@@ -167,7 +199,9 @@ class TestCriticNode:
                 user_id="user_1",
                 session_id="session_1",
                 answer="NIM Sentinel is an enterprise RAG system.",
-                citations=[{"document_id": "doc1", "chunk_index": 0, "content": "test", "score": 0.9}],
+                citations=[
+                    {"document_id": "doc1", "chunk_index": 0, "content": "test", "score": 0.9}
+                ],
                 confidence=0.85,
             )
             result = await critic_node(state)
@@ -183,12 +217,14 @@ class TestCriticNode:
         """Test that critic_node updates state when rejected."""
         with patch("nim_sentinel.graph.nodes.critic.Critic") as mock_critic_class:
             mock_critic = AsyncMock()
-            mock_critic.review = AsyncMock(return_value=CriticOutput(
-                approved=False,
-                feedback="Missing citations",
-                confidence=0.3,
-                suggested_changes=["Add citations"],
-            ))
+            mock_critic.review = AsyncMock(
+                return_value=CriticOutput(
+                    approved=False,
+                    feedback="Missing citations",
+                    confidence=0.3,
+                    suggested_changes=["Add citations"],
+                )
+            )
             mock_critic_class.return_value = mock_critic
 
             state = AgentState(
@@ -213,12 +249,14 @@ class TestCriticNode:
         """Test that critic_node doesn't increment retry_count beyond max."""
         with patch("nim_sentinel.graph.nodes.critic.Critic") as mock_critic_class:
             mock_critic = AsyncMock()
-            mock_critic.review = AsyncMock(return_value=CriticOutput(
-                approved=False,
-                feedback="Still missing citations",
-                confidence=0.3,
-                suggested_changes=["Add citations"],
-            ))
+            mock_critic.review = AsyncMock(
+                return_value=CriticOutput(
+                    approved=False,
+                    feedback="Still missing citations",
+                    confidence=0.3,
+                    suggested_changes=["Add citations"],
+                )
+            )
             mock_critic_class.return_value = mock_critic
 
             state = AgentState(

@@ -5,11 +5,12 @@ Tests for /v1/chat and /v1/chat/stream endpoints with JWT authentication.
 Uses httpx.AsyncClient with ASGITransport and mocks database calls.
 """
 
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
-from unittest.mock import AsyncMock, patch, MagicMock
+import pytest
+from nim_sentinel.core.security import create_access_token, create_dev_token
 from nim_sentinel.main import app
-from nim_sentinel.core.security import create_dev_token, create_access_token
 
 
 def create_async_client():
@@ -21,7 +22,10 @@ def create_async_client():
 @pytest.fixture
 def auth_headers():
     """Create auth headers with dev token (all permissions)."""
-    token = create_dev_token(tenant_id="test_tenant", permissions=["chat", "documents:read", "documents:write", "documents:delete"])
+    token = create_dev_token(
+        tenant_id="test_tenant",
+        permissions=["chat", "documents:read", "documents:write", "documents:delete"],
+    )
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -72,14 +76,15 @@ def mock_database():
         mock_get_db.return_value = mock_db
 
         # Mock repositories
-        with patch("nim_sentinel.api.routes.get_document_repository") as mock_doc_repo, \
-             patch("nim_sentinel.api.routes.get_chunk_repository") as mock_chunk_repo, \
-             patch("nim_sentinel.rag.ingestion.embedder.get_embedding_client") as mock_embedding, \
-             patch("nim_sentinel.api.routes.get_hybrid_retriever") as mock_retriever, \
-             patch("nim_sentinel.api.routes.run_graph") as mock_run_graph, \
-             patch("nim_sentinel.api.routes.get_graph_for_tenant") as mock_get_graph, \
-             patch("nim_sentinel.api.routes.create_checkpointer") as mock_checkpointer:
-
+        with (
+            patch("nim_sentinel.api.routes.get_document_repository") as mock_doc_repo,
+            patch("nim_sentinel.api.routes.get_chunk_repository") as mock_chunk_repo,
+            patch("nim_sentinel.rag.ingestion.embedder.get_embedding_client") as mock_embedding,
+            patch("nim_sentinel.api.routes.get_hybrid_retriever") as mock_retriever,
+            patch("nim_sentinel.api.routes.run_graph") as mock_run_graph,
+            patch("nim_sentinel.api.routes.get_graph_for_tenant") as mock_get_graph,
+            patch("nim_sentinel.api.routes.create_checkpointer") as mock_checkpointer,
+        ):
             # Setup mock returns
             mock_doc_repo.return_value = AsyncMock()
             mock_doc_repo.return_value.get_document.return_value = None
@@ -121,25 +126,19 @@ class TestChatEndpoints:
         async with create_async_client() as client:
             # Missing query
             response = await client.post(
-                "/v1/chat",
-                headers=auth_headers,
-                json={"session_id": "test_session"}
+                "/v1/chat", headers=auth_headers, json={"session_id": "test_session"}
             )
             assert response.status_code == 422
 
             # Missing session_id
             response = await client.post(
-                "/v1/chat",
-                headers=auth_headers,
-                json={"query": "What is NIM Sentinel?"}
+                "/v1/chat", headers=auth_headers, json={"query": "What is NIM Sentinel?"}
             )
             assert response.status_code == 422
 
             # Empty query
             response = await client.post(
-                "/v1/chat",
-                headers=auth_headers,
-                json={"query": "", "session_id": "test_session"}
+                "/v1/chat", headers=auth_headers, json={"query": "", "session_id": "test_session"}
             )
             assert response.status_code == 422
 
@@ -147,7 +146,7 @@ class TestChatEndpoints:
             response = await client.post(
                 "/v1/chat",
                 headers=auth_headers,
-                json={"query": "x" * 10001, "session_id": "test_session"}
+                json={"query": "x" * 10001, "session_id": "test_session"},
             )
             assert response.status_code == 422
 
@@ -157,17 +156,13 @@ class TestChatEndpoints:
         async with create_async_client() as client:
             # Missing query
             response = await client.post(
-                "/v1/chat/stream",
-                headers=auth_headers,
-                json={"session_id": "test_session"}
+                "/v1/chat/stream", headers=auth_headers, json={"session_id": "test_session"}
             )
             assert response.status_code == 422
 
             # Missing session_id
             response = await client.post(
-                "/v1/chat/stream",
-                headers=auth_headers,
-                json={"query": "What is NIM Sentinel?"}
+                "/v1/chat/stream", headers=auth_headers, json={"query": "What is NIM Sentinel?"}
             )
             assert response.status_code == 422
 
@@ -181,7 +176,7 @@ class TestChatEndpoints:
                 json={
                     "query": "What is NIM Sentinel?",
                     "session_id": "test_session",
-                }
+                },
             )
             # Should return 200 with SSE content type
             assert response.status_code == 200
@@ -197,16 +192,12 @@ class TestAgentQueryEndpoint:
     async def test_agent_query_validation(self, auth_headers):
         async with create_async_client() as client:
             response = await client.post(
-                "/v1/agent/query",
-                headers=auth_headers,
-                json={"session_id": "test_session"}
+                "/v1/agent/query", headers=auth_headers, json={"session_id": "test_session"}
             )
             assert response.status_code == 422
 
             response = await client.post(
-                "/v1/agent/query",
-                headers=auth_headers,
-                json={"query": "What is NIM Sentinel?"}
+                "/v1/agent/query", headers=auth_headers, json={"query": "What is NIM Sentinel?"}
             )
             assert response.status_code == 422
 
@@ -238,14 +229,20 @@ class TestQueryEndpoint:
             assert response.status_code == 422
 
             # Query too long
-            response = await client.post("/v1/query", headers=auth_headers, json={"query": "x" * 10001})
+            response = await client.post(
+                "/v1/query", headers=auth_headers, json={"query": "x" * 10001}
+            )
             assert response.status_code == 422
 
             # Invalid top_k
-            response = await client.post("/v1/query", headers=auth_headers, json={"query": "test", "top_k": 0})
+            response = await client.post(
+                "/v1/query", headers=auth_headers, json={"query": "test", "top_k": 0}
+            )
             assert response.status_code == 422
 
-            response = await client.post("/v1/query", headers=auth_headers, json={"query": "test", "top_k": 51})
+            response = await client.post(
+                "/v1/query", headers=auth_headers, json={"query": "test", "top_k": 51}
+            )
             assert response.status_code == 422
 
 

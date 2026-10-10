@@ -5,7 +5,6 @@ Manages model configurations, fallback chains, circuit breakers, and cost/latenc
 """
 
 import asyncio
-import logging
 import random
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
@@ -20,12 +19,12 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
 from langchain_nvidia_ai_endpoints import ChatNVIDIA, NVIDIAEmbeddings, NVIDIARerank
 from nim_sentinel.core import (
-    FallbackExhaustedError,
     ModelRole,
     ModelUnavailableError,
     get_available_model_roles,
     get_model_config,
 )
+from nim_sentinel.core.errors import FallbackExhaustedError
 from nim_sentinel.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -44,14 +43,16 @@ DEFAULT_JITTER_FACTOR = 0.1
 
 class CircuitState(StrEnum):
     """Circuit breaker states."""
-    CLOSED = "closed"      # Normal operation
-    OPEN = "open"          # Failing, reject requests
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failing, reject requests
     HALF_OPEN = "half_open"  # Testing recovery
 
 
 @dataclass
 class CircuitBreaker:
     """Circuit breaker for model endpoints."""
+
     failure_threshold: int = 5
     recovery_timeout: float = 60.0  # seconds
     half_open_max_calls: int = 3
@@ -115,6 +116,7 @@ class CircuitBreaker:
 @dataclass
 class ModelMetrics:
     """Metrics for a model."""
+
     model_id: str
     role: str
     total_calls: int = 0
@@ -127,7 +129,14 @@ class ModelMetrics:
     last_used: datetime | None = None
     last_error: str | None = None
 
-    def record_call(self, tokens_in: int, tokens_out: int, latency_ms: float, cost_usd: float, error: str | None = None) -> None:
+    def record_call(
+        self,
+        tokens_in: int,
+        tokens_out: int,
+        latency_ms: float,
+        cost_usd: float,
+        error: str | None = None,
+    ) -> None:
         """Record a call."""
         self.total_calls += 1
         self.total_tokens_in += tokens_in
@@ -269,7 +278,9 @@ class ModelRegistry:
 
         return self._chat_models[model_id]
 
-    def get_embedding_model(self, role: ModelRole | str = ModelRole.EMBEDDING, use_fallback: bool = False) -> NVIDIAEmbeddings:
+    def get_embedding_model(
+        self, role: ModelRole | str = ModelRole.EMBEDDING, use_fallback: bool = False
+    ) -> NVIDIAEmbeddings:
         """Get an embedding model."""
         role_str = role.value if isinstance(role, ModelRole) else role
         config = get_model_config(role_str)
@@ -289,7 +300,9 @@ class ModelRegistry:
 
         return self._embedding_models[model_id]
 
-    def get_rerank_model(self, role: ModelRole | str = ModelRole.RERANKER, use_fallback: bool = False) -> NVIDIARerank:
+    def get_rerank_model(
+        self, role: ModelRole | str = ModelRole.RERANKER, use_fallback: bool = False
+    ) -> NVIDIARerank:
         """Get a rerank model."""
         role_str = role.value if isinstance(role, ModelRole) else role
         config = get_model_config(role_str)
@@ -332,7 +345,9 @@ class ModelRegistry:
 
         try:
             if model_type == "chat":
-                model: BaseChatModel | Embeddings | NVIDIARerank = self.get_chat_model(role_str, use_fallback)
+                model: BaseChatModel | Embeddings | NVIDIARerank = self.get_chat_model(
+                    role_str, use_fallback
+                )
             elif model_type == "embedding":
                 model = self.get_embedding_model(role_str, use_fallback)
             elif model_type == "rerank":
@@ -374,10 +389,7 @@ class ModelRegistry:
         """Get metrics for all models or a specific role."""
         if role:
             role_str = role.value if isinstance(role, ModelRole) else role
-            return {
-                k: v for k, v in self._metrics.items()
-                if k.startswith(f"{role_str}:")
-            }
+            return {k: v for k, v in self._metrics.items() if k.startswith(f"{role_str}:")}
         return self._metrics.copy()
 
     def get_circuit_states(self) -> dict[str, CircuitState]:
@@ -435,8 +447,6 @@ class ModelRegistry:
         if max_retries is None:
             max_retries = config.max_retries
 
-        fallback_used = False
-
         # Try primary model with retries
         for attempt in range(max_retries + 1):
             try:
@@ -450,7 +460,7 @@ class ModelRegistry:
 
                 if attempt < max_retries and is_retryable:
                     # Calculate exponential backoff with jitter
-                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    delay = min(base_delay * (2**attempt), max_delay)
                     jitter = delay * jitter_factor * random.random()
                     total_delay = delay + jitter
 
@@ -484,7 +494,6 @@ class ModelRegistry:
 
         # Try fallback model with retries
         if config.fallback:
-            fallback_used = True
             for attempt in range(max_retries + 1):
                 try:
                     async with self.tracked_call(role_str, model_type, use_fallback=True) as model:
@@ -500,7 +509,7 @@ class ModelRegistry:
                     is_retryable = self._is_retryable_error(e)
 
                     if attempt < max_retries and is_retryable:
-                        delay = min(base_delay * (2 ** attempt), max_delay)
+                        delay = min(base_delay * (2**attempt), max_delay)
                         jitter = delay * jitter_factor * random.random()
                         total_delay = delay + jitter
 
@@ -531,7 +540,9 @@ class ModelRegistry:
                     break
 
         # Both primary and fallback exhausted
-        raise FallbackExhaustedError(role_str, [config.primary, config.fallback] if config.fallback else [config.primary])
+        raise FallbackExhaustedError(
+            role_str, [config.primary, config.fallback] if config.fallback else [config.primary]
+        )
 
     def _is_retryable_error(self, error: Exception) -> bool:
         """Check if an error is retryable (429, 500, 502, 503, 504, timeout)."""
@@ -547,7 +558,7 @@ class ModelRegistry:
                 return True
 
         # Check for specific exception types
-        if isinstance(error, (asyncio.TimeoutError, TimeoutError)):
+        if isinstance(error, asyncio.TimeoutError | TimeoutError):
             return True
 
         return False
@@ -562,6 +573,7 @@ def get_model_registry() -> ModelRegistry:
     global _model_registry
     if _model_registry is None:
         from nim_sentinel.core.config import get_settings
+
         settings = get_settings()
         _model_registry = ModelRegistry(nvidia_api_key=settings.nvidia_api_key)
         _model_registry.initialize()
@@ -573,9 +585,6 @@ def reset_model_registry() -> None:
     global _model_registry
     _model_registry = None
 
-
-# Export FallbackExhaustedError for convenience
-from nim_sentinel.core.errors import FallbackExhaustedError
 
 __all__ = [
     "ModelRegistry",
@@ -602,12 +611,16 @@ def get_chat_model(role: ModelRole | str, use_fallback: bool = False) -> ChatNVI
     return get_model_registry().get_chat_model(role, use_fallback)
 
 
-def get_embedding_model(role: ModelRole | str = ModelRole.EMBEDDING, use_fallback: bool = False) -> NVIDIAEmbeddings:
+def get_embedding_model(
+    role: ModelRole | str = ModelRole.EMBEDDING, use_fallback: bool = False
+) -> NVIDIAEmbeddings:
     """Get an embedding model from the global registry."""
     return get_model_registry().get_embedding_model(role, use_fallback)
 
 
-def get_rerank_model(role: ModelRole | str = ModelRole.RERANKER, use_fallback: bool = False) -> NVIDIARerank:
+def get_rerank_model(
+    role: ModelRole | str = ModelRole.RERANKER, use_fallback: bool = False
+) -> NVIDIARerank:
     """Get a rerank model from the global registry."""
     return get_model_registry().get_rerank_model(role, use_fallback)
 
@@ -648,6 +661,7 @@ F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 def with_fallback(role: ModelRole | str, model_type: str = "chat") -> Callable[[F], F]:
     """Decorator to automatically retry with fallback on failure."""
+
     def decorator(func: F) -> F:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -665,13 +679,18 @@ def with_fallback(role: ModelRole | str, model_type: str = "chat") -> Callable[[
                 config = get_model_config(role_str)
                 if config.fallback:
                     try:
-                        async with registry.tracked_call(role_str, model_type, use_fallback=True) as model:
+                        async with registry.tracked_call(
+                            role_str, model_type, use_fallback=True
+                        ) as model:
                             return await func(model, *args, **kwargs)
                     except Exception as fallback_error:
                         logger.error(f"Fallback model also failed for {role_str}: {fallback_error}")
-                        raise FallbackExhaustedError(role_str, [config.primary, config.fallback]) from fallback_error
+                        raise FallbackExhaustedError(
+                            role_str, [config.primary, config.fallback]
+                        ) from fallback_error
                 else:
                     raise FallbackExhaustedError(role_str, [config.primary]) from None
 
         return wrapper  # type: ignore[return-value]
+
     return decorator

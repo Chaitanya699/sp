@@ -63,7 +63,9 @@ class TestMongoClient:
 
         with patch("nim_sentinel.db.client.AsyncMongoClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.admin.command = AsyncMock(side_effect=ServerSelectionTimeoutError("timeout"))
+            mock_client.admin.command = AsyncMock(
+                side_effect=ServerSelectionTimeoutError("timeout")
+            )
             mock_client_class.return_value = mock_client
 
             client = MongoClient()
@@ -159,6 +161,7 @@ class TestBaseRepository:
     @pytest.fixture
     def repo(self, mock_db):
         """Create a test repository."""
+
         class TestRepo(BaseRepository):
             collection_name = "test_collection"
             indexes = []
@@ -167,6 +170,7 @@ class TestBaseRepository:
 
     def test_tenant_id_required(self, mock_db):
         """Test that tenant_id is required."""
+
         class TestRepo(BaseRepository):
             collection_name = "test"
             indexes = []
@@ -466,9 +470,7 @@ class TestSessionRepository:
     @pytest.mark.asyncio
     async def test_get_user_sessions(self, repo):
         """Test getting user sessions."""
-        expected_sessions = [
-            {"_id": ObjectId(), "thread_id": f"thread_{i}"} for i in range(3)
-        ]
+        expected_sessions = [{"_id": ObjectId(), "thread_id": f"thread_{i}"} for i in range(3)]
         repo._collection.find = MagicMock()
         mock_cursor = AsyncMock()
         mock_cursor.to_list = AsyncMock(return_value=expected_sessions)
@@ -549,6 +551,7 @@ class TestGlobalClient:
 
             # Reset global
             import nim_sentinel.db.client as client_module
+
             client_module._mongo_client = None
 
             client1 = await get_mongo_client()

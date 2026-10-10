@@ -6,8 +6,9 @@ Tenant isolation is enforced at the repository layer.
 """
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator
+from typing import Any
 
 from nim_sentinel.core.config import get_settings
 from nim_sentinel.core.errors import MongoConnectionError
@@ -43,7 +44,7 @@ class MongoClient:
         if not uri:
             raise MongoConnectionError(
                 "No MongoDB URI configured. Set MONGODB_URI or MONGODB_LOCAL_URI.",
-                {"reason": "No MongoDB URI configured. Set MONGODB_URI or MONGODB_LOCAL_URI."}
+                {"reason": "No MongoDB URI configured. Set MONGODB_URI or MONGODB_LOCAL_URI."},
             )
 
         try:
@@ -68,7 +69,7 @@ class MongoClient:
             logger.error("MongoDB connection failed: %s", e)
             raise MongoConnectionError(
                 f"Failed to connect to MongoDB: {e}",
-                {"reason": f"Failed to connect to MongoDB: {e}"}
+                {"reason": f"Failed to connect to MongoDB: {e}"},
             ) from e
 
     async def disconnect(self) -> None:
@@ -86,7 +87,7 @@ class MongoClient:
         if not self._connected or self._db is None:
             raise MongoConnectionError(
                 "MongoDB not connected. Call connect() first.",
-                {"reason": "MongoDB not connected. Call connect() first."}
+                {"reason": "MongoDB not connected. Call connect() first."},
             )
         return self._db
 
@@ -96,7 +97,7 @@ class MongoClient:
         if not self._connected or self._client is None:
             raise MongoConnectionError(
                 "MongoDB not connected. Call connect() first.",
-                {"reason": "MongoDB not connected. Call connect() first."}
+                {"reason": "MongoDB not connected. Call connect() first."},
             )
         return self._client
 
@@ -116,10 +117,7 @@ class MongoClient:
     async def session(self) -> AsyncGenerator[AsyncClientSession, None]:
         """Create a client session for transactions."""
         if not self._connected:
-            raise MongoConnectionError(
-                "MongoDB not connected",
-                {"reason": "MongoDB not connected"}
-            )
+            raise MongoConnectionError("MongoDB not connected", {"reason": "MongoDB not connected"})
         assert self._client is not None
         async with self._client.start_session() as session:
             yield session

@@ -10,6 +10,7 @@ from typing import Final
 
 class ModelRole(StrEnum):
     """Model roles in the registry."""
+
     SUPERVISOR_LLM = "supervisor_llm"
     REASONING_LLM = "reasoning_llm"
     GENERATOR_LLM = "generator_llm"
@@ -28,6 +29,7 @@ class ModelRole(StrEnum):
 
 class IntentType(StrEnum):
     """User intent classification."""
+
     KNOWLEDGE_QUESTION = "knowledge_question"
     DATA_ANALYTICS = "data_analytics"
     DOCUMENT_ANALYSIS = "document_analysis"
@@ -41,6 +43,7 @@ class IntentType(StrEnum):
 
 class GuardrailAction(StrEnum):
     """Guardrail action types."""
+
     BLOCK = "block"
     FLAG = "flag"
     LOG = "log"
@@ -50,6 +53,7 @@ class GuardrailAction(StrEnum):
 
 class GuardrailType(StrEnum):
     """Guardrail types."""
+
     INPUT = "input"
     OUTPUT = "output"
     TOOL = "tool"
@@ -57,6 +61,7 @@ class GuardrailType(StrEnum):
 
 class MessageRole(StrEnum):
     """Message roles in conversation."""
+
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"
@@ -65,6 +70,7 @@ class MessageRole(StrEnum):
 
 class DocumentStatus(StrEnum):
     """Document processing status."""
+
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -73,6 +79,7 @@ class DocumentStatus(StrEnum):
 
 class ThreadStatus(StrEnum):
     """Conversation thread status."""
+
     ACTIVE = "active"
     ARCHIVED = "archived"
     DELETED = "deleted"
@@ -80,6 +87,7 @@ class ThreadStatus(StrEnum):
 
 class ApprovalStatus(StrEnum):
     """Human approval status."""
+
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
@@ -88,6 +96,7 @@ class ApprovalStatus(StrEnum):
 
 class ToolRiskLevel(StrEnum):
     """Tool risk levels."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"

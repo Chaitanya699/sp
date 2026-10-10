@@ -6,12 +6,12 @@ for evaluating retrieval quality (recall@k, MRR).
 """
 
 from dataclasses import dataclass
-from typing import Literal
 
 
 @dataclass
 class RetrievalGoldenExample:
     """A single golden example for retrieval evaluation."""
+
     query: str
     relevant_doc_ids: list[str]  # Document IDs that should be retrieved
     relevant_chunk_indices: list[int]  # Chunk indices within those docs
@@ -26,70 +26,70 @@ GOLDEN_RETRIEVAL_EXAMPLES = [
         relevant_doc_ids=["6ac4a67b682ec73ee2fbf5de", "6ac4a646086abafcfe0de936"],
         relevant_chunk_indices=[0, 0],
         category="factual",
-        description="Basic system definition query"
+        description="Basic system definition query",
     ),
     RetrievalGoldenExample(
         query="How does hybrid retrieval work in NIM Sentinel?",
         relevant_doc_ids=["6ac4a67b682ec73ee2fbf5de"],
         relevant_chunk_indices=[0],
         category="technical",
-        description="Technical architecture question"
+        description="Technical architecture question",
     ),
     RetrievalGoldenExample(
         query="What are the key features of NIM Sentinel?",
         relevant_doc_ids=["6ac4a67b682ec73ee2fbf5de", "6ac4a646086abafcfe0de936"],
         relevant_chunk_indices=[0, 0],
         category="factual",
-        description="Feature overview question"
+        description="Feature overview question",
     ),
     RetrievalGoldenExample(
         query="Explain tenant isolation in NIM Sentinel",
         relevant_doc_ids=["6ac4a67b682ec73ee2fbf5de"],
         relevant_chunk_indices=[0],
         category="technical",
-        description="Multi-tenancy question"
+        description="Multi-tenancy question",
     ),
     RetrievalGoldenExample(
         query="Which NVIDIA models does NIM Sentinel use for embeddings?",
         relevant_doc_ids=["6ac4a67b682ec73ee2fbf5de"],
         relevant_chunk_indices=[0],
         category="technical",
-        description="Model configuration question"
+        description="Model configuration question",
     ),
     RetrievalGoldenExample(
         query="How do I upload a document to NIM Sentinel?",
         relevant_doc_ids=["6ac4a67b682ec73ee2fbf5de"],
         relevant_chunk_indices=[0],
         category="howto",
-        description="Document upload procedure"
+        description="Document upload procedure",
     ),
     RetrievalGoldenExample(
         query="What is the process for document ingestion?",
         relevant_doc_ids=["6ac4a67b682ec73ee2fbf5de"],
         relevant_chunk_indices=[0],
         category="howto",
-        description="Ingestion pipeline question"
+        description="Ingestion pipeline question",
     ),
     RetrievalGoldenExample(
         query="What's the difference between vector search and full-text search?",
         relevant_doc_ids=["6ac4a67b682ec73ee2fbf5de"],
         relevant_chunk_indices=[0],
         category="comparison",
-        description="Technical comparison question"
+        description="Technical comparison question",
     ),
     RetrievalGoldenExample(
         query="How to fix authentication errors in NIM Sentinel?",
         relevant_doc_ids=["6ac4a67b682ec73ee2fbf5de"],
         relevant_chunk_indices=[0],
         category="troubleshooting",
-        description="Auth troubleshooting question"
+        description="Auth troubleshooting question",
     ),
     RetrievalGoldenExample(
         query="What are the best practices for optimizing retrieval accuracy?",
         relevant_doc_ids=["6ac4a67b682ec73ee2fbf5de"],
         relevant_chunk_indices=[0],
         category="analytical",
-        description="Best practices question"
+        description="Best practices question",
     ),
 ]
 
@@ -117,4 +117,6 @@ if __name__ == "__main__":
         print(f"  {cat}: {len(examples)} examples")
     print("\nAll examples:")
     for i, ex in enumerate(GOLDEN_RETRIEVAL_EXAMPLES, 1):
-        print(f"  {i}. [{ex.category}] {ex.query[:60]}... -> {len(ex.relevant_doc_ids)} relevant docs")
+        print(
+            f"  {i}. [{ex.category}] {ex.query[:60]}... -> {len(ex.relevant_doc_ids)} relevant docs"
+        )

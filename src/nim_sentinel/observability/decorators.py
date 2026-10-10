@@ -13,8 +13,11 @@ from collections.abc import Callable
 from typing import Any, TypeVar
 
 from langsmith import traceable
-
-from nim_sentinel.observability.redaction import redact_for_logging
+from nim_sentinel.observability.redaction import (
+    redact_for_logging,
+    redact_messages_for_logging,
+    redact_state_for_logging,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,7 @@ def _get_git_sha() -> str:
     """Get current git SHA for trace metadata."""
     try:
         import subprocess
+
         result = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True,
@@ -78,6 +82,7 @@ def traced_node(
         async def retrieve_node(state: GraphState) -> GraphState:
             ...
     """
+
     def decorator(func: F) -> F:
         trace_name = name or func.__name__
 
@@ -158,6 +163,7 @@ def traced_node(
 
         # Return appropriate wrapper based on whether function is async
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore[return-value]
         return sync_wrapper  # type: ignore[return-value]
@@ -192,6 +198,7 @@ def traced_tool(
         async def vector_search(query: str, tenant_id: str) -> list[Document]:
             ...
     """
+
     def decorator(func: F) -> F:
         trace_name = name or func.__name__
 
@@ -271,6 +278,7 @@ def traced_tool(
                 raise
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore[return-value]
         return sync_wrapper  # type: ignore[return-value]
@@ -307,6 +315,7 @@ def traced_llm_call(
         async def call_supervisor(prompt: str) -> str:
             ...
     """
+
     def decorator(func: F) -> F:
         trace_name = name or func.__name__
 
@@ -323,7 +332,9 @@ def traced_llm_call(
             prompt = kwargs.get("prompt") or (args[0] if args else "")
             if redact and prompt:
                 logged_prompt = redact_for_logging(str(prompt))
-                logger.debug(f"LLM {trace_name} started", extra={"prompt": logged_prompt, "role": role})
+                logger.debug(
+                    f"LLM {trace_name} started", extra={"prompt": logged_prompt, "role": role}
+                )
             else:
                 logger.debug(f"LLM {trace_name} started", extra={"role": role})
 
@@ -338,7 +349,10 @@ def traced_llm_call(
                         extra={"duration_ms": duration_ms, "response": logged_result, "role": role},
                     )
                 else:
-                    logger.debug(f"LLM {trace_name} completed", extra={"duration_ms": duration_ms, "role": role})
+                    logger.debug(
+                        f"LLM {trace_name} completed",
+                        extra={"duration_ms": duration_ms, "role": role},
+                    )
 
                 return result
             except Exception as e:
@@ -361,7 +375,9 @@ def traced_llm_call(
             prompt = kwargs.get("prompt") or (args[0] if args else "")
             if redact and prompt:
                 logged_prompt = redact_for_logging(str(prompt))
-                logger.debug(f"LLM {trace_name} started", extra={"prompt": logged_prompt, "role": role})
+                logger.debug(
+                    f"LLM {trace_name} started", extra={"prompt": logged_prompt, "role": role}
+                )
             else:
                 logger.debug(f"LLM {trace_name} started", extra={"role": role})
 
@@ -376,7 +392,10 @@ def traced_llm_call(
                         extra={"duration_ms": duration_ms, "response": logged_result, "role": role},
                     )
                 else:
-                    logger.debug(f"LLM {trace_name} completed", extra={"duration_ms": duration_ms, "role": role})
+                    logger.debug(
+                        f"LLM {trace_name} completed",
+                        extra={"duration_ms": duration_ms, "role": role},
+                    )
 
                 return result
             except Exception as e:
@@ -388,6 +407,7 @@ def traced_llm_call(
                 raise
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore[return-value]
         return sync_wrapper  # type: ignore[return-value]
@@ -422,6 +442,7 @@ def traced_retriever(
         async def retrieve(query: str, tenant_id: str) -> list[Document]:
             ...
     """
+
     def decorator(func: F) -> F:
         trace_name = name or func.__name__
 
@@ -496,6 +517,7 @@ def traced_retriever(
                 raise
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore[return-value]
         return sync_wrapper  # type: ignore[return-value]

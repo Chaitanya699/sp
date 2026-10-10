@@ -2,10 +2,11 @@
 Tests for NIM Sentinel Graph Supervisor Module (B2)
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from nim_sentinel.graph.state import AgentState, SupervisorDecision
-from nim_sentinel.graph.supervisor import Supervisor, supervisor_node, get_next_node
+from nim_sentinel.graph.supervisor import Supervisor, get_next_node, supervisor_node
 
 
 class TestSupervisor:
@@ -85,7 +86,9 @@ class TestSupervisor:
             answer="some answer",
             critique_feedback="approved",
             needs_critique=False,
-            metadata={"critic_output": {"approved": True, "feedback": "approved", "confidence": 0.9}},
+            metadata={
+                "critic_output": {"approved": True, "feedback": "approved", "confidence": 0.9}
+            },
         )
         decision = await supervisor.decide(state)
         assert decision.next_node == "end"
@@ -94,7 +97,9 @@ class TestSupervisor:
     @pytest.mark.asyncio
     async def test_decide_default_rag(self, supervisor):
         """Test that normal queries route to rag_subgraph."""
-        state = AgentState(query="What is NIM Sentinel?", tenant_id="t1", user_id="u1", session_id="s1")
+        state = AgentState(
+            query="What is NIM Sentinel?", tenant_id="t1", user_id="u1", session_id="s1"
+        )
         decision = await supervisor.decide(state)
         assert decision.next_node == "rag_subgraph"
         assert "rag" in decision.reasoning.lower()
@@ -108,11 +113,13 @@ class TestSupervisorNode:
         """Test that supervisor_node updates state metadata."""
         with patch("nim_sentinel.graph.supervisor.Supervisor") as mock_supervisor_class:
             mock_supervisor = AsyncMock()
-            mock_supervisor.decide = AsyncMock(return_value=SupervisorDecision(
-                next_node="rag_subgraph",
-                reasoning="Test reasoning",
-                confidence=0.9,
-            ))
+            mock_supervisor.decide = AsyncMock(
+                return_value=SupervisorDecision(
+                    next_node="rag_subgraph",
+                    reasoning="Test reasoning",
+                    confidence=0.9,
+                )
+            )
             mock_supervisor_class.return_value = mock_supervisor
 
             state = AgentState(query="test", tenant_id="t1", user_id="u1", session_id="s1")

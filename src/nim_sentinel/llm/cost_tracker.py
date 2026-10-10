@@ -22,6 +22,7 @@ logger = get_logger(__name__)
 @dataclass
 class CostSnapshot:
     """Snapshot of cost metrics at a point in time."""
+
     timestamp: datetime
     role: str
     model_id: str
@@ -36,6 +37,7 @@ class CostSnapshot:
 @dataclass
 class AggregatedCosts:
     """Aggregated cost metrics for a role."""
+
     role: str
     total_calls: int = 0
     successful_calls: int = 0
@@ -105,13 +107,11 @@ MODEL_PRICING = {
     "nvidia/llama-3.1-nemoguard-8b-topic-control": {"input": 0.10, "output": 0.10},
     "ibm/granite-guardian-3.0-8b": {"input": 0.10, "output": 0.10},
     "meta/llama-guard-4-12b": {"input": 0.10, "output": 0.10},
-
     # Embedding models (per 1M tokens)
     "nvidia/nv-embedqa-e5-v5": {"input": 0.05, "output": 0},
     "nvidia/llama-3.2-nv-embedqa-1b-v2": {"input": 0.02, "output": 0},
     "nvidia/nv-embed-v1": {"input": 0.05, "output": 0},
     "baai/bge-m3": {"input": 0.02, "output": 0},
-
     # Rerank models (per 1M tokens)
     "nvidia/llama-3.2-nv-rerankqa-1b-v1": {"input": 0.10, "output": 0},
     "nvidia/llama-nemotron-rerank-1b-v2": {"input": 0.10, "output": 0},
@@ -171,7 +171,7 @@ class CostTracker:
             # Store snapshot
             self._snapshots.append(snapshot)
             if len(self._snapshots) > self._max_snapshots:
-                self._snapshots = self._snapshots[-self._max_snapshots:]
+                self._snapshots = self._snapshots[-self._max_snapshots :]
 
         # Log to LangSmith metadata (would be done via callback in practice)
         logger.debug(
@@ -219,7 +219,9 @@ class CostTracker:
         with self._lock:
             total_calls = sum(a.total_calls for a in self._aggregates.values())
             total_cost = sum(a.total_cost_usd for a in self._aggregates.values())
-            total_tokens = sum(a.total_tokens_in + a.total_tokens_out for a in self._aggregates.values())
+            total_tokens = sum(
+                a.total_tokens_in + a.total_tokens_out for a in self._aggregates.values()
+            )
 
             return {
                 "total_calls": total_calls,
@@ -303,9 +305,12 @@ async def track_cost(role: ModelRole | str, model_id: str) -> AsyncGenerator[dic
         )
 
 
-def estimate_cost(role: ModelRole | str, estimated_tokens_in: int, estimated_tokens_out: int) -> float:
+def estimate_cost(
+    role: ModelRole | str, estimated_tokens_in: int, estimated_tokens_out: int
+) -> float:
     """Estimate cost for a model call."""
     from nim_sentinel.core import get_model_config
+
     config = get_model_config(role)
     model_id = config.primary
     tracker = get_cost_tracker()

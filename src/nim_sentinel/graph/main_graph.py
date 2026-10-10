@@ -6,18 +6,18 @@ Orchestrates the multi-agent RAG system with supervisor, RAG subgraph, and criti
 
 import logging
 from typing import Any
-from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.base import BaseCheckpointSaver
-from langchain_core.runnables import RunnableConfig
-from langgraph.graph.state import CompiledStateGraph
 
-from nim_sentinel.graph.state import AgentState, create_initial_state
-from nim_sentinel.graph.supervisor import supervisor_node, get_next_node
-from nim_sentinel.graph.subgraphs.rag import rag_subgraph
+from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.graph import END, StateGraph
+from langgraph.graph.state import CompiledStateGraph
+from nim_sentinel.graph.checkpointer import create_checkpointer
 from nim_sentinel.graph.nodes.critic import critic_node
-from nim_sentinel.graph.checkpointer import MongoDBCheckpointer, create_checkpointer
-from nim_sentinel.guardrails.input_guard import InputGuardrails, get_input_guardrails
-from nim_sentinel.guardrails.output_guard import OutputGuardrails, get_output_guardrails
+from nim_sentinel.graph.state import AgentState, create_initial_state
+from nim_sentinel.graph.subgraphs.rag import rag_subgraph
+from nim_sentinel.graph.supervisor import get_next_node, supervisor_node
+from nim_sentinel.guardrails.input_guard import get_input_guardrails
+from nim_sentinel.guardrails.output_guard import get_output_guardrails
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,9 @@ async def output_guard_node(state: AgentState) -> AgentState:
     return state
 
 
-def create_graph(checkpointer: BaseCheckpointSaver[Any] | None = None) -> CompiledStateGraph[Any, Any, Any, Any]:
+def create_graph(
+    checkpointer: BaseCheckpointSaver[Any] | None = None,
+) -> CompiledStateGraph[Any, Any, Any, Any]:
     """
     Create the main agent graph.
 
@@ -189,8 +191,11 @@ async def run_graph(
     if isinstance(final_state, dict):
         final_state = AgentState(**final_state)
 
-    logger.info("Graph completed. Answer length: %d, confidence: %.2f",
-                len(final_state.answer), final_state.confidence)
+    logger.info(
+        "Graph completed. Answer length: %d, confidence: %.2f",
+        len(final_state.answer),
+        final_state.confidence,
+    )
 
     return final_state
 

@@ -5,8 +5,8 @@ Tests for Observability - Redaction module
 import pytest
 from nim_sentinel.observability.redaction import (
     redact_for_logging,
-    redact_state_for_logging,
     redact_messages_for_logging,
+    redact_state_for_logging,
 )
 
 
@@ -70,6 +70,7 @@ class TestRedactMessagesForLogging:
 
     def test_redact_base_message(self):
         """Test redaction of BaseMessage-like objects."""
+
         class MockMessage:
             def __init__(self, content):
                 self.content = content
@@ -81,7 +82,10 @@ class TestRedactMessagesForLogging:
 
     def test_redact_dict_message(self):
         """Test redaction of dict messages."""
-        messages = [{"content": "Email: test@example.com", "role": "user"}, {"content": "Hello", "role": "assistant"}]
+        messages = [
+            {"content": "Email: test@example.com", "role": "user"},
+            {"content": "Hello", "role": "assistant"},
+        ]
         result = redact_messages_for_logging(messages)
         assert "[REDACTED_EMAIL]" in result[0]["content"]
         assert result[1]["content"] == "Hello"

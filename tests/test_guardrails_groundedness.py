@@ -4,9 +4,8 @@ Tests for Guardrails - Groundedness module
 
 import pytest
 from nim_sentinel.guardrails.groundedness import (
-    check_groundedness,
     check_citation_coverage,
-    GroundednessResult,
+    check_groundedness,
 )
 
 
@@ -37,7 +36,9 @@ class TestCheckGroundedness:
 
     def test_citations_with_specific_claims_sufficient(self):
         """Test groundedness passes with specific claims and sufficient citations."""
-        citations = [{"content": "The answer is 42 according to the documentation and verified sources"}]
+        citations = [
+            {"content": "The answer is 42 according to the documentation and verified sources"}
+        ]
         result = check_groundedness("The answer is 42", citations)
         assert result.grounded is True
         assert result.score == 0.8
@@ -74,7 +75,11 @@ class TestCheckCitationCoverage:
     def test_full_coverage(self):
         """Test full coverage of key terms."""
         answer = "The temperature is 25 degrees in New York"
-        citations = [{"content": "The temperature is 25 degrees in New York according to the weather service"}]
+        citations = [
+            {
+                "content": "The temperature is 25 degrees in New York according to the weather service"
+            }
+        ]
         result = check_citation_coverage(answer, citations)
         assert result["coverage"] == 1.0
         assert len(result["missing_from_citations"]) == 0

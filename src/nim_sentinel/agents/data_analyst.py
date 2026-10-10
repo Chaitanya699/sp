@@ -9,8 +9,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from nim_sentinel.core.config import get_settings
-from nim_sentinel.db.client import get_mongo_client
+from nim_sentinel.db.client import MongoClient, get_mongo_client
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +58,7 @@ FORBIDDEN_STAGES = {
 @dataclass
 class AnalystQuery:
     """A validated analyst query."""
+
     collection: str
     pipeline: list[dict[str, Any]]
     tenant_id: str
@@ -68,6 +68,7 @@ class AnalystQuery:
 @dataclass
 class AnalystResult:
     """Result of an analyst query execution."""
+
     data: list[dict[str, Any]]
     row_count: int
     truncated: bool
@@ -94,9 +95,9 @@ class DataAnalystAgent:
     ) -> None:
         self.max_rows = max_rows
         self.absolute_max_rows = absolute_max_rows
-        self._client = None
+        self._client: MongoClient | None = None
 
-    async def _get_client(self):
+    async def _get_client(self) -> MongoClient:
         """Get MongoDB client."""
         if self._client is None:
             self._client = await get_mongo_client()
@@ -144,7 +145,9 @@ class DataAnalystAgent:
 
         return True, ""
 
-    def inject_tenant_filter(self, pipeline: list[dict[str, Any]], tenant_id: str) -> list[dict[str, Any]]:
+    def inject_tenant_filter(
+        self, pipeline: list[dict[str, Any]], tenant_id: str
+    ) -> list[dict[str, Any]]:
         """
         Inject tenant_id filter into the pipeline.
 
@@ -162,13 +165,13 @@ class DataAnalystAgent:
             existing_match = first_stage["$match"]
             if isinstance(existing_match, dict):
                 # Create new match with tenant_id AND existing conditions
-                new_match = {"tenant_id": tenant_id}
+                new_match: dict[str, Any] = {"tenant_id": tenant_id}
                 # Handle $and if present
                 if "$and" in existing_match:
                     new_match["$and"] = [{"tenant_id": tenant_id}] + existing_match["$and"]
                 else:
                     # Wrap existing conditions in $and with tenant_id
-                    conditions = [{"tenant_id": tenant_id}]
+                    conditions: list[dict[str, Any]] = [{"tenant_id": tenant_id}]
                     for k, v in existing_match.items():
                         conditions.append({k: v})
                     new_match = {"$and": conditions}
@@ -177,7 +180,9 @@ class DataAnalystAgent:
         # No $match at start, prepend one
         return [{"$match": {"tenant_id": tenant_id}}] + pipeline
 
-    def enforce_row_limit(self, pipeline: list[dict[str, Any]], max_rows: int) -> list[dict[str, Any]]:
+    def enforce_row_limit(
+        self, pipeline: list[dict[str, Any]], max_rows: int
+    ) -> list[dict[str, Any]]:
         """
         Ensure pipeline has a $limit stage within bounds.
         """
@@ -203,7 +208,9 @@ class DataAnalystAgent:
 
         return pipeline
 
-    def sanitize_pipeline(self, pipeline: list[dict[str, Any]], tenant_id: str, max_rows: int) -> list[dict[str, Any]]:
+    def sanitize_pipeline(
+        self, pipeline: list[dict[str, Any]], tenant_id: str, max_rows: int
+    ) -> list[dict[str, Any]]:
         """
         Full pipeline sanitization: validate, inject tenant filter, enforce row limit.
         """
@@ -263,14 +270,11 @@ class DataAnalystAgent:
 
         try:
             client = await self._get_client()
-            db = client[get_settings().mongodb_database]
+            db = client.database
             coll = db[collection]
 
-            # Execute aggregation
-            cursor = coll.aggregate(safe_pipeline)
-            # coll.aggregate returns a coroutine in motor/pymongo async, need to await it
-            if hasattr(cursor, '__await__'):
-                cursor = await cursor
+            # Execute aggregation - AsyncMongoClient returns coroutine for aggregate
+            cursor = await coll.aggregate(safe_pipeline)
             data = []
             async for doc in cursor:
                 data.append(doc)
@@ -352,12 +356,12 @@ class DataAnalystAgent:
 
         # Build $sort
         if sort:
-            sort_dict = {field: direction for field, direction in sort}
+            sort_dict = dict(sort)
             pipeline.append({"$sort": sort_dict})
 
         # Build $limit
         if limit:
-            pipeline.append({"$limit": limit})
+            pipeline.append({"$limit": limit})  # type: ignore[dict-item]
 
         return await self.execute(collection, pipeline, tenant_id, limit or self.max_rows)
 

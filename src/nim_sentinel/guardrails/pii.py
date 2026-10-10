@@ -27,6 +27,7 @@ PII_PATTERNS = {
 @dataclass
 class PIIResult:
     """Result of PII detection."""
+
     pii_type: str
     count: int
     matches: list[str]
@@ -53,7 +54,9 @@ def detect_pii(text: str) -> list[PIIResult]:
                     flat_matches.append("".join(m))
                 else:
                     flat_matches.append(m)
-            results.append(PIIResult(pii_type=pii_type, count=len(flat_matches), matches=flat_matches))
+            results.append(
+                PIIResult(pii_type=pii_type, count=len(flat_matches), matches=flat_matches)
+            )
     return results
 
 
@@ -98,8 +101,11 @@ def redact_pii_dict(data: dict[str, Any], replacement: str = "[REDACTED]") -> di
             redacted[key] = redact_pii_dict(value, replacement)
         elif isinstance(value, list):
             redacted[key] = [
-                redact_pii(item, replacement) if isinstance(item, str) else
-                redact_pii_dict(item, replacement) if isinstance(item, dict) else item
+                redact_pii(item, replacement)
+                if isinstance(item, str)
+                else redact_pii_dict(item, replacement)
+                if isinstance(item, dict)
+                else item
                 for item in value
             ]
         else:

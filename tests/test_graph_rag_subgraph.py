@@ -2,10 +2,11 @@
 Tests for NIM Sentinel Graph RAG Subgraph Module (B3)
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from nim_sentinel.graph.state import AgentState
-from nim_sentinel.graph.subgraphs.rag import retrieve_node, generate_node, rag_subgraph
+from nim_sentinel.graph.subgraphs.rag import generate_node, rag_subgraph, retrieve_node
 
 
 class TestRetrieveNode:
@@ -14,11 +15,12 @@ class TestRetrieveNode:
     @pytest.mark.asyncio
     async def test_retrieve_node_calls_retriever(self):
         """Test that retrieve_node calls the hybrid retriever."""
-        with patch("nim_sentinel.graph.subgraphs.rag.get_embedding_client") as mock_get_embedding, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_database") as mock_get_db, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_chunk_repository") as mock_get_chunk_repo, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_hybrid_retriever") as mock_get_retriever:
-
+        with (
+            patch("nim_sentinel.graph.subgraphs.rag.get_embedding_client") as mock_get_embedding,
+            patch("nim_sentinel.graph.subgraphs.rag.get_database") as mock_get_db,
+            patch("nim_sentinel.graph.subgraphs.rag.get_chunk_repository") as mock_get_chunk_repo,
+            patch("nim_sentinel.graph.subgraphs.rag.get_hybrid_retriever") as mock_get_retriever,
+        ):
             # Mock embedding client
             mock_embedding_client = AsyncMock()
             mock_embedding_client.embed_query = AsyncMock(return_value=[0.1] * 2048)
@@ -33,20 +35,32 @@ class TestRetrieveNode:
 
             # Mock retriever
             mock_retriever = AsyncMock()
-            mock_retriever.retrieve = AsyncMock(return_value=[
-                MagicMock(
-                    content="Test content 1",
-                    score=0.9,
-                    metadata={"document_id": "doc1", "chunk_id": "chunk1", "chunk_index": 0},
-                    to_citation=lambda: {"document_id": "doc1", "chunk_index": 0, "content": "Test content 1", "score": 0.9}
-                ),
-                MagicMock(
-                    content="Test content 2",
-                    score=0.8,
-                    metadata={"document_id": "doc2", "chunk_id": "chunk2", "chunk_index": 1},
-                    to_citation=lambda: {"document_id": "doc2", "chunk_index": 1, "content": "Test content 2", "score": 0.8}
-                ),
-            ])
+            mock_retriever.retrieve = AsyncMock(
+                return_value=[
+                    MagicMock(
+                        content="Test content 1",
+                        score=0.9,
+                        metadata={"document_id": "doc1", "chunk_id": "chunk1", "chunk_index": 0},
+                        to_citation=lambda: {
+                            "document_id": "doc1",
+                            "chunk_index": 0,
+                            "content": "Test content 1",
+                            "score": 0.9,
+                        },
+                    ),
+                    MagicMock(
+                        content="Test content 2",
+                        score=0.8,
+                        metadata={"document_id": "doc2", "chunk_id": "chunk2", "chunk_index": 1},
+                        to_citation=lambda: {
+                            "document_id": "doc2",
+                            "chunk_index": 1,
+                            "content": "Test content 2",
+                            "score": 0.8,
+                        },
+                    ),
+                ]
+            )
             mock_get_retriever.return_value = mock_retriever
 
             state = AgentState(
@@ -67,11 +81,12 @@ class TestRetrieveNode:
     @pytest.mark.asyncio
     async def test_retrieve_node_empty_results(self):
         """Test retrieve_node with empty results."""
-        with patch("nim_sentinel.graph.subgraphs.rag.get_embedding_client") as mock_get_embedding, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_database") as mock_get_db, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_chunk_repository") as mock_get_chunk_repo, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_hybrid_retriever") as mock_get_retriever:
-
+        with (
+            patch("nim_sentinel.graph.subgraphs.rag.get_embedding_client") as mock_get_embedding,
+            patch("nim_sentinel.graph.subgraphs.rag.get_database") as mock_get_db,
+            patch("nim_sentinel.graph.subgraphs.rag.get_chunk_repository") as mock_get_chunk_repo,
+            patch("nim_sentinel.graph.subgraphs.rag.get_hybrid_retriever") as mock_get_retriever,
+        ):
             # Mock embedding client
             mock_embedding_client = AsyncMock()
             mock_embedding_client.embed_query = AsyncMock(return_value=[0.1] * 2048)
@@ -107,13 +122,16 @@ class TestGenerateNode:
     @pytest.mark.asyncio
     async def test_generate_node_with_results(self):
         """Test generate_node with retrieval results."""
-        with patch("nim_sentinel.llm.model_registry.get_model_registry") as mock_get_registry, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_settings") as mock_settings, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_model_config") as mock_model_config:
-
+        with (
+            patch("nim_sentinel.llm.model_registry.get_model_registry") as mock_get_registry,
+            patch("nim_sentinel.core.config.get_settings") as mock_settings,
+            patch("nim_sentinel.core.config.get_model_config") as mock_model_config,
+        ):
             # Mock model registry
             mock_registry = AsyncMock()
-            mock_registry.call_with_retry_and_fallback = AsyncMock(return_value="NIM Sentinel is an enterprise RAG system.")
+            mock_registry.call_with_retry_and_fallback = AsyncMock(
+                return_value="NIM Sentinel is an enterprise RAG system."
+            )
             mock_get_registry.return_value = mock_registry
 
             mock_settings.return_value.nvidia_api_key = "test-key"
@@ -127,12 +145,12 @@ class TestGenerateNode:
                 MagicMock(
                     content="NIM Sentinel is an enterprise multi-agent RAG system.",
                     score=0.9,
-                    metadata={"document_id": "doc1", "chunk_id": "chunk1", "chunk_index": 0}
+                    metadata={"document_id": "doc1", "chunk_id": "chunk1", "chunk_index": 0},
                 ),
                 MagicMock(
                     content="It uses MongoDB Atlas for vector storage.",
                     score=0.8,
-                    metadata={"document_id": "doc2", "chunk_id": "chunk2", "chunk_index": 1}
+                    metadata={"document_id": "doc2", "chunk_id": "chunk2", "chunk_index": 1},
                 ),
             ]
 
@@ -175,14 +193,15 @@ class TestRAGSubgraph:
     @pytest.mark.asyncio
     async def test_rag_subgraph_full_flow(self):
         """Test full RAG subgraph flow: retrieve -> generate."""
-        with patch("nim_sentinel.graph.subgraphs.rag.get_embedding_client") as mock_get_embedding, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_database") as mock_get_db, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_chunk_repository") as mock_get_chunk_repo, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_hybrid_retriever") as mock_get_retriever, \
-             patch("nim_sentinel.llm.model_registry.get_model_registry") as mock_get_registry, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_settings") as mock_settings, \
-             patch("nim_sentinel.graph.subgraphs.rag.get_model_config") as mock_model_config:
-
+        with (
+            patch("nim_sentinel.graph.subgraphs.rag.get_embedding_client") as mock_get_embedding,
+            patch("nim_sentinel.graph.subgraphs.rag.get_database") as mock_get_db,
+            patch("nim_sentinel.graph.subgraphs.rag.get_chunk_repository") as mock_get_chunk_repo,
+            patch("nim_sentinel.graph.subgraphs.rag.get_hybrid_retriever") as mock_get_retriever,
+            patch("nim_sentinel.llm.model_registry.get_model_registry") as mock_get_registry,
+            patch("nim_sentinel.core.config.get_settings") as mock_settings,
+            patch("nim_sentinel.core.config.get_model_config") as mock_model_config,
+        ):
             # Mock embedding client
             mock_embedding_client = AsyncMock()
             mock_embedding_client.embed_query = AsyncMock(return_value=[0.1] * 2048)
@@ -197,19 +216,28 @@ class TestRAGSubgraph:
 
             # Mock retriever
             mock_retriever = AsyncMock()
-            mock_retriever.retrieve = AsyncMock(return_value=[
-                MagicMock(
-                    content="NIM Sentinel is an enterprise multi-agent RAG system.",
-                    score=0.9,
-                    metadata={"document_id": "doc1", "chunk_id": "chunk1", "chunk_index": 0},
-                    to_citation=lambda: {"document_id": "doc1", "chunk_index": 0, "content": "NIM Sentinel is an enterprise multi-agent RAG system.", "score": 0.9}
-                ),
-            ])
+            mock_retriever.retrieve = AsyncMock(
+                return_value=[
+                    MagicMock(
+                        content="NIM Sentinel is an enterprise multi-agent RAG system.",
+                        score=0.9,
+                        metadata={"document_id": "doc1", "chunk_id": "chunk1", "chunk_index": 0},
+                        to_citation=lambda: {
+                            "document_id": "doc1",
+                            "chunk_index": 0,
+                            "content": "NIM Sentinel is an enterprise multi-agent RAG system.",
+                            "score": 0.9,
+                        },
+                    ),
+                ]
+            )
             mock_get_retriever.return_value = mock_retriever
 
             # Mock model registry
             mock_registry = AsyncMock()
-            mock_registry.call_with_retry_and_fallback = AsyncMock(return_value="NIM Sentinel is an enterprise RAG system with NVIDIA NIM integration.")
+            mock_registry.call_with_retry_and_fallback = AsyncMock(
+                return_value="NIM Sentinel is an enterprise RAG system with NVIDIA NIM integration."
+            )
             mock_get_registry.return_value = mock_registry
 
             mock_settings.return_value.nvidia_api_key = "test-key"

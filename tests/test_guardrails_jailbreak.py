@@ -4,13 +4,11 @@ Tests for Guardrails - Jailbreak module
 
 import pytest
 from nim_sentinel.guardrails.jailbreak import (
-    detect_jailbreak,
-    detect_injection,
-    detect_all_heuristic,
-    JailbreakResult,
-    InjectionResult,
-    JailbreakType,
     InjectionType,
+    JailbreakType,
+    detect_all_heuristic,
+    detect_injection,
+    detect_jailbreak,
 )
 
 

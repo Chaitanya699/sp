@@ -49,6 +49,7 @@ class TestCircuitBreaker:
         cb.record_failure()
         assert cb.state == CircuitState.OPEN
         import time
+
         time.sleep(0.02)
         assert cb.can_execute() is True
         assert cb.state == CircuitState.HALF_OPEN
@@ -59,6 +60,7 @@ class TestCircuitBreaker:
         cb.record_failure()
         cb.record_failure()
         import time
+
         time.sleep(0.02)
         cb.can_execute()  # Enter half-open
         cb.record_success()
@@ -71,6 +73,7 @@ class TestCircuitBreaker:
         cb.record_failure()
         cb.record_failure()
         import time
+
         time.sleep(0.02)
         cb.can_execute()  # Enter half-open
         cb.record_failure()
@@ -137,7 +140,9 @@ class TestModelFactory:
         """Test chat model creation."""
         mock_chat.return_value = MagicMock(spec=ChatNVIDIA)
         _model = self.factory.create_chat_model("test-model", temperature=0.5, max_tokens=1000)
-        mock_chat.assert_called_once_with(model="test-model", temperature=0.5, max_tokens=1000, timeout=30, nvidia_api_key="")
+        mock_chat.assert_called_once_with(
+            model="test-model", temperature=0.5, max_tokens=1000, timeout=30, nvidia_api_key=""
+        )
 
     @patch("nim_sentinel.llm.model_registry.NVIDIAEmbeddings")
     def test_create_embedding_model(self, mock_embed):
@@ -207,7 +212,9 @@ class TestModelRegistry:
 
         model = registry.get_chat_model("supervisor_llm")
         assert model is mock_model
-        mock_create.assert_called_once_with(model_id="primary-model", temperature=0.1, max_tokens=4096, timeout=30)
+        mock_create.assert_called_once_with(
+            model_id="primary-model", temperature=0.1, max_tokens=4096, timeout=30
+        )
 
     @patch("nim_sentinel.llm.model_registry.get_model_config")
     @patch("nim_sentinel.llm.model_registry.ModelFactory.create_chat_model")
@@ -232,7 +239,9 @@ class TestModelRegistry:
 
         model = registry.get_chat_model("supervisor_llm", use_fallback=True)
         assert model is mock_model
-        mock_create.assert_called_once_with(model_id="fallback-model", temperature=0.1, max_tokens=4096, timeout=30)
+        mock_create.assert_called_once_with(
+            model_id="fallback-model", temperature=0.1, max_tokens=4096, timeout=30
+        )
 
     @patch("nim_sentinel.llm.model_registry.get_model_config")
     def test_get_chat_model_circuit_open_tries_fallback(self, mock_get_config):
@@ -337,12 +346,13 @@ class TestModelRegistry:
         registry = ModelRegistry()
         registry._initialized = True
         registry._circuit_breakers["supervisor_llm:primary"] = CircuitBreaker()
-        registry._metrics["supervisor_llm:primary"] = ModelMetrics(model_id="primary-model", role="supervisor_llm")
+        registry._metrics["supervisor_llm:primary"] = ModelMetrics(
+            model_id="primary-model", role="supervisor_llm"
+        )
 
         mock_model = MagicMock(spec=ChatNVIDIA)
         registry._chat_models["primary-model"] = mock_model
 
-        import asyncio
 
         async def test():
             async with registry.tracked_call("supervisor_llm", "chat", False) as model:
@@ -371,12 +381,13 @@ class TestModelRegistry:
         registry = ModelRegistry()
         registry._initialized = True
         registry._circuit_breakers["supervisor_llm:primary"] = CircuitBreaker()
-        registry._metrics["supervisor_llm:primary"] = ModelMetrics(model_id="primary-model", role="supervisor_llm")
+        registry._metrics["supervisor_llm:primary"] = ModelMetrics(
+            model_id="primary-model", role="supervisor_llm"
+        )
 
         mock_model = MagicMock(spec=ChatNVIDIA)
         registry._chat_models["primary-model"] = mock_model
 
-        import asyncio
 
         async def test():
             try:
@@ -481,6 +492,7 @@ class TestConvenienceFunctions:
         """Test get_chat_model convenience function."""
         mock_get.return_value = MagicMock(spec=ChatNVIDIA)
         from nim_sentinel.llm.model_registry import get_chat_model as gc
+
         _model = gc("supervisor_llm")
         mock_get.assert_called_once_with("supervisor_llm", False)
 
@@ -489,6 +501,7 @@ class TestConvenienceFunctions:
         """Test get_embedding_model convenience function."""
         mock_get.return_value = MagicMock(spec=NVIDIAEmbeddings)
         from nim_sentinel.llm.model_registry import get_embedding_model as ge
+
         _model = ge()
         mock_get.assert_called_once_with(ModelRole.EMBEDDING, False)
 
@@ -497,6 +510,7 @@ class TestConvenienceFunctions:
         """Test get_rerank_model convenience function."""
         mock_get.return_value = MagicMock(spec=NVIDIARerank)
         from nim_sentinel.llm.model_registry import get_rerank_model as gr
+
         _model = gr()
         mock_get.assert_called_once_with(ModelRole.RERANKER, False)
 
@@ -513,7 +527,6 @@ class TestTrackedCallFunctions:
         mock_tracked.return_value.__aenter__ = AsyncMock(return_value=MagicMock(spec=ChatNVIDIA))
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        import asyncio
 
         async def test():
             async with tracked_chat_call("supervisor_llm") as _model:
@@ -525,10 +538,11 @@ class TestTrackedCallFunctions:
     @patch("nim_sentinel.llm.model_registry.ModelRegistry.tracked_call")
     def test_tracked_embedding_call(self, mock_tracked):
         """Test tracked_embedding_call."""
-        mock_tracked.return_value.__aenter__ = AsyncMock(return_value=MagicMock(spec=NVIDIAEmbeddings))
+        mock_tracked.return_value.__aenter__ = AsyncMock(
+            return_value=MagicMock(spec=NVIDIAEmbeddings)
+        )
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        import asyncio
 
         async def test():
             async with tracked_embedding_call() as _model:
@@ -543,7 +557,6 @@ class TestTrackedCallFunctions:
         mock_tracked.return_value.__aenter__ = AsyncMock(return_value=MagicMock(spec=NVIDIARerank))
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        import asyncio
 
         async def test():
             async with tracked_rerank_call() as _model:
@@ -576,7 +589,7 @@ class TestWithFallbackDecorator:
         async def test_func(_model):
             return "success"
 
-        import asyncio
+
         result = asyncio.run(test_func())
         assert result == "success"
         # Only primary should be called
@@ -593,14 +606,16 @@ class TestWithFallbackDecorator:
 
         mock_model = MagicMock(spec=ChatNVIDIA)
         # First call (primary) raises, second (fallback) succeeds
-        mock_tracked.return_value.__aenter__ = AsyncMock(side_effect=[Exception("primary failed"), mock_model])
+        mock_tracked.return_value.__aenter__ = AsyncMock(
+            side_effect=[Exception("primary failed"), mock_model]
+        )
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
         @with_fallback("supervisor_llm")
         async def test_func(_model):
             return "success"
 
-        import asyncio
+
         result = asyncio.run(test_func())
         assert result == "success"
         assert mock_tracked.call_count == 2
@@ -614,14 +629,16 @@ class TestWithFallbackDecorator:
         mock_config.fallback = "fallback-model"
         mock_get_config.return_value = mock_config
 
-        mock_tracked.return_value.__aenter__ = AsyncMock(side_effect=[Exception("primary failed"), Exception("fallback failed")])
+        mock_tracked.return_value.__aenter__ = AsyncMock(
+            side_effect=[Exception("primary failed"), Exception("fallback failed")]
+        )
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
         @with_fallback("supervisor_llm")
         async def test_func(_model):
             return "success"
 
-        import asyncio
+
         with pytest.raises(FallbackExhaustedError):
             asyncio.run(test_func())
         assert mock_tracked.call_count == 2
@@ -642,7 +659,7 @@ class TestWithFallbackDecorator:
         async def test_func(_model):
             return "success"
 
-        import asyncio
+
         with pytest.raises(FallbackExhaustedError):
             asyncio.run(test_func())
         assert mock_tracked.call_count == 1
@@ -656,7 +673,9 @@ class TestCallWithRetryAndFallback:
 
     @patch("nim_sentinel.llm.model_registry.get_model_config")
     @patch("nim_sentinel.llm.model_registry.ModelRegistry.tracked_call")
-    async def test_call_with_retry_and_fallback_primary_succeeds(self, mock_tracked, mock_get_config):
+    async def test_call_with_retry_and_fallback_primary_succeeds(
+        self, mock_tracked, mock_get_config
+    ):
         """Test call_with_retry_and_fallback when primary succeeds on first try."""
         mock_config = MagicMock()
         mock_config.primary = "primary-model"
@@ -671,7 +690,9 @@ class TestCallWithRetryAndFallback:
         registry = ModelRegistry()
         registry._initialized = True
         registry._circuit_breakers["supervisor_llm:primary"] = CircuitBreaker()
-        registry._metrics["supervisor_llm:primary"] = ModelMetrics(model_id="primary-model", role="supervisor_llm")
+        registry._metrics["supervisor_llm:primary"] = ModelMetrics(
+            model_id="primary-model", role="supervisor_llm"
+        )
 
         async def test_func(model):
             return "success"
@@ -682,7 +703,9 @@ class TestCallWithRetryAndFallback:
 
     @patch("nim_sentinel.llm.model_registry.get_model_config")
     @patch("nim_sentinel.llm.model_registry.ModelRegistry.tracked_call")
-    async def test_call_with_retry_and_fallback_retry_then_succeeds(self, mock_tracked, mock_get_config):
+    async def test_call_with_retry_and_fallback_retry_then_succeeds(
+        self, mock_tracked, mock_get_config
+    ):
         """Test call_with_retry_and_fallback retries on retryable error then succeeds."""
         mock_config = MagicMock()
         mock_config.primary = "primary-model"
@@ -692,24 +715,32 @@ class TestCallWithRetryAndFallback:
 
         mock_model = MagicMock(spec=ChatNVIDIA)
         # First call fails with retryable error, second succeeds
-        mock_tracked.return_value.__aenter__ = AsyncMock(side_effect=[Exception("503 Service Unavailable"), mock_model])
+        mock_tracked.return_value.__aenter__ = AsyncMock(
+            side_effect=[Exception("503 Service Unavailable"), mock_model]
+        )
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
         registry = ModelRegistry()
         registry._initialized = True
         registry._circuit_breakers["supervisor_llm:primary"] = CircuitBreaker()
-        registry._metrics["supervisor_llm:primary"] = ModelMetrics(model_id="primary-model", role="supervisor_llm")
+        registry._metrics["supervisor_llm:primary"] = ModelMetrics(
+            model_id="primary-model", role="supervisor_llm"
+        )
 
         async def test_func(model):
             return "success"
 
-        result = await registry.call_with_retry_and_fallback("supervisor_llm", "chat", test_func, max_retries=3, base_delay=0.01)
+        result = await registry.call_with_retry_and_fallback(
+            "supervisor_llm", "chat", test_func, max_retries=3, base_delay=0.01
+        )
         assert result == "success"
         assert mock_tracked.call_count == 2
 
     @patch("nim_sentinel.llm.model_registry.get_model_config")
     @patch("nim_sentinel.llm.model_registry.ModelRegistry.tracked_call")
-    async def test_call_with_retry_and_fallback_primary_exhausted_fallback_succeeds(self, mock_tracked, mock_get_config):
+    async def test_call_with_retry_and_fallback_primary_exhausted_fallback_succeeds(
+        self, mock_tracked, mock_get_config
+    ):
         """Test call_with_retry_and_fallback tries fallback when primary exhausted."""
         mock_config = MagicMock()
         mock_config.primary = "primary-model"
@@ -719,31 +750,41 @@ class TestCallWithRetryAndFallback:
 
         mock_model = MagicMock(spec=ChatNVIDIA)
         # Primary fails 3 times (max_retries + 1), fallback succeeds
-        mock_tracked.return_value.__aenter__ = AsyncMock(side_effect=[
-            Exception("503 Service Unavailable"),
-            Exception("503 Service Unavailable"),
-            Exception("503 Service Unavailable"),
-            mock_model
-        ])
+        mock_tracked.return_value.__aenter__ = AsyncMock(
+            side_effect=[
+                Exception("503 Service Unavailable"),
+                Exception("503 Service Unavailable"),
+                Exception("503 Service Unavailable"),
+                mock_model,
+            ]
+        )
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
         registry = ModelRegistry()
         registry._initialized = True
         registry._circuit_breakers["supervisor_llm:primary"] = CircuitBreaker()
         registry._circuit_breakers["supervisor_llm:fallback"] = CircuitBreaker()
-        registry._metrics["supervisor_llm:primary"] = ModelMetrics(model_id="primary-model", role="supervisor_llm")
-        registry._metrics["supervisor_llm:fallback"] = ModelMetrics(model_id="fallback-model", role="supervisor_llm")
+        registry._metrics["supervisor_llm:primary"] = ModelMetrics(
+            model_id="primary-model", role="supervisor_llm"
+        )
+        registry._metrics["supervisor_llm:fallback"] = ModelMetrics(
+            model_id="fallback-model", role="supervisor_llm"
+        )
 
         async def test_func(model):
             return "success"
 
-        result = await registry.call_with_retry_and_fallback("supervisor_llm", "chat", test_func, max_retries=2, base_delay=0.01)
+        result = await registry.call_with_retry_and_fallback(
+            "supervisor_llm", "chat", test_func, max_retries=2, base_delay=0.01
+        )
         assert result == "success"
         assert mock_tracked.call_count == 4  # 3 primary + 1 fallback
 
     @patch("nim_sentinel.llm.model_registry.get_model_config")
     @patch("nim_sentinel.llm.model_registry.ModelRegistry.tracked_call")
-    async def test_call_with_retry_and_fallback_both_exhausted_raises(self, mock_tracked, mock_get_config):
+    async def test_call_with_retry_and_fallback_both_exhausted_raises(
+        self, mock_tracked, mock_get_config
+    ):
         """Test call_with_retry_and_fallback raises FallbackExhaustedError when both fail."""
         mock_config = MagicMock()
         mock_config.primary = "primary-model"
@@ -752,26 +793,34 @@ class TestCallWithRetryAndFallback:
         mock_get_config.return_value = mock_config
 
         # Both primary and fallback fail
-        mock_tracked.return_value.__aenter__ = AsyncMock(side_effect=[
-            Exception("503 Service Unavailable"),
-            Exception("503 Service Unavailable"),
-            Exception("503 Service Unavailable"),
-            Exception("503 Service Unavailable"),
-        ])
+        mock_tracked.return_value.__aenter__ = AsyncMock(
+            side_effect=[
+                Exception("503 Service Unavailable"),
+                Exception("503 Service Unavailable"),
+                Exception("503 Service Unavailable"),
+                Exception("503 Service Unavailable"),
+            ]
+        )
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
         registry = ModelRegistry()
         registry._initialized = True
         registry._circuit_breakers["supervisor_llm:primary"] = CircuitBreaker()
         registry._circuit_breakers["supervisor_llm:fallback"] = CircuitBreaker()
-        registry._metrics["supervisor_llm:primary"] = ModelMetrics(model_id="primary-model", role="supervisor_llm")
-        registry._metrics["supervisor_llm:fallback"] = ModelMetrics(model_id="fallback-model", role="supervisor_llm")
+        registry._metrics["supervisor_llm:primary"] = ModelMetrics(
+            model_id="primary-model", role="supervisor_llm"
+        )
+        registry._metrics["supervisor_llm:fallback"] = ModelMetrics(
+            model_id="fallback-model", role="supervisor_llm"
+        )
 
         async def test_func(model):
             return "success"
 
         with pytest.raises(FallbackExhaustedError) as exc_info:
-            await registry.call_with_retry_and_fallback("supervisor_llm", "chat", test_func, max_retries=1, base_delay=0.01)
+            await registry.call_with_retry_and_fallback(
+                "supervisor_llm", "chat", test_func, max_retries=1, base_delay=0.01
+            )
 
         assert exc_info.value.details["model_role"] == "supervisor_llm"
         assert "primary-model" in exc_info.value.models
@@ -780,7 +829,9 @@ class TestCallWithRetryAndFallback:
 
     @patch("nim_sentinel.llm.model_registry.get_model_config")
     @patch("nim_sentinel.llm.model_registry.ModelRegistry.tracked_call")
-    async def test_call_with_retry_and_fallback_no_fallback_configured(self, mock_tracked, mock_get_config):
+    async def test_call_with_retry_and_fallback_no_fallback_configured(
+        self, mock_tracked, mock_get_config
+    ):
         """Test call_with_retry_and_fallback when no fallback configured."""
         mock_config = MagicMock()
         mock_config.primary = "primary-model"
@@ -788,22 +839,28 @@ class TestCallWithRetryAndFallback:
         mock_config.max_retries = 1
         mock_get_config.return_value = mock_config
 
-        mock_tracked.return_value.__aenter__ = AsyncMock(side_effect=[
-            Exception("503 Service Unavailable"),
-            Exception("503 Service Unavailable"),
-        ])
+        mock_tracked.return_value.__aenter__ = AsyncMock(
+            side_effect=[
+                Exception("503 Service Unavailable"),
+                Exception("503 Service Unavailable"),
+            ]
+        )
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
         registry = ModelRegistry()
         registry._initialized = True
         registry._circuit_breakers["supervisor_llm:primary"] = CircuitBreaker()
-        registry._metrics["supervisor_llm:primary"] = ModelMetrics(model_id="primary-model", role="supervisor_llm")
+        registry._metrics["supervisor_llm:primary"] = ModelMetrics(
+            model_id="primary-model", role="supervisor_llm"
+        )
 
         async def test_func(model):
             return "success"
 
         with pytest.raises(FallbackExhaustedError) as exc_info:
-            await registry.call_with_retry_and_fallback("supervisor_llm", "chat", test_func, max_retries=1, base_delay=0.01)
+            await registry.call_with_retry_and_fallback(
+                "supervisor_llm", "chat", test_func, max_retries=1, base_delay=0.01
+            )
 
         assert exc_info.value.details["model_role"] == "supervisor_llm"
         assert exc_info.value.models == ["primary-model"]
@@ -811,7 +868,9 @@ class TestCallWithRetryAndFallback:
 
     @patch("nim_sentinel.llm.model_registry.get_model_config")
     @patch("nim_sentinel.llm.model_registry.ModelRegistry.tracked_call")
-    async def test_call_with_retry_and_fallback_non_retryable_error(self, mock_tracked, mock_get_config):
+    async def test_call_with_retry_and_fallback_non_retryable_error(
+        self, mock_tracked, mock_get_config
+    ):
         """Test call_with_retry_and_fallback doesn't retry on non-retryable error."""
         mock_config = MagicMock()
         mock_config.primary = "primary-model"
@@ -821,20 +880,28 @@ class TestCallWithRetryAndFallback:
 
         mock_model = MagicMock(spec=ChatNVIDIA)
         # Non-retryable error (400 Bad Request) - should not retry, go straight to fallback
-        mock_tracked.return_value.__aenter__ = AsyncMock(side_effect=[Exception("400 Bad Request"), mock_model])
+        mock_tracked.return_value.__aenter__ = AsyncMock(
+            side_effect=[Exception("400 Bad Request"), mock_model]
+        )
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
         registry = ModelRegistry()
         registry._initialized = True
         registry._circuit_breakers["supervisor_llm:primary"] = CircuitBreaker()
         registry._circuit_breakers["supervisor_llm:fallback"] = CircuitBreaker()
-        registry._metrics["supervisor_llm:primary"] = ModelMetrics(model_id="primary-model", role="supervisor_llm")
-        registry._metrics["supervisor_llm:fallback"] = ModelMetrics(model_id="fallback-model", role="supervisor_llm")
+        registry._metrics["supervisor_llm:primary"] = ModelMetrics(
+            model_id="primary-model", role="supervisor_llm"
+        )
+        registry._metrics["supervisor_llm:fallback"] = ModelMetrics(
+            model_id="fallback-model", role="supervisor_llm"
+        )
 
         async def test_func(model):
             return "success"
 
-        result = await registry.call_with_retry_and_fallback("supervisor_llm", "chat", test_func, max_retries=3, base_delay=0.01)
+        result = await registry.call_with_retry_and_fallback(
+            "supervisor_llm", "chat", test_func, max_retries=3, base_delay=0.01
+        )
         assert result == "success"
         assert mock_tracked.call_count == 2  # 1 primary (non-retryable) + 1 fallback
 
@@ -850,24 +917,32 @@ class TestCallWithRetryAndFallback:
 
         mock_model = MagicMock(spec=ChatNVIDIA)
         # Timeout error - should retry
-        mock_tracked.return_value.__aenter__ = AsyncMock(side_effect=[asyncio.TimeoutError("timeout"), mock_model])
+        mock_tracked.return_value.__aenter__ = AsyncMock(
+            side_effect=[TimeoutError("timeout"), mock_model]
+        )
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
         registry = ModelRegistry()
         registry._initialized = True
         registry._circuit_breakers["supervisor_llm:primary"] = CircuitBreaker()
-        registry._metrics["supervisor_llm:primary"] = ModelMetrics(model_id="primary-model", role="supervisor_llm")
+        registry._metrics["supervisor_llm:primary"] = ModelMetrics(
+            model_id="primary-model", role="supervisor_llm"
+        )
 
         async def test_func(model):
             return "success"
 
-        result = await registry.call_with_retry_and_fallback("supervisor_llm", "chat", test_func, max_retries=2, base_delay=0.01)
+        result = await registry.call_with_retry_and_fallback(
+            "supervisor_llm", "chat", test_func, max_retries=2, base_delay=0.01
+        )
         assert result == "success"
         assert mock_tracked.call_count == 2
 
     @patch("nim_sentinel.llm.model_registry.get_model_config")
     @patch("nim_sentinel.llm.model_registry.ModelRegistry.tracked_call")
-    async def test_call_with_retry_and_fallback_fallback_tracking_in_result(self, mock_tracked, mock_get_config):
+    async def test_call_with_retry_and_fallback_fallback_tracking_in_result(
+        self, mock_tracked, mock_get_config
+    ):
         """Test call_with_retry_and_fallback adds llm_fallback_used to dict result."""
         mock_config = MagicMock()
         mock_config.primary = "primary-model"
@@ -876,24 +951,31 @@ class TestCallWithRetryAndFallback:
         mock_get_config.return_value = mock_config
 
         mock_model = MagicMock(spec=ChatNVIDIA)
-        mock_tracked.return_value.__aenter__ = AsyncMock(side_effect=[
-            Exception("503 Service Unavailable"),
-            Exception("503 Service Unavailable"),
-            mock_model
-        ])
+        mock_tracked.return_value.__aenter__ = AsyncMock(
+            side_effect=[
+                Exception("503 Service Unavailable"),
+                Exception("503 Service Unavailable"),
+                mock_model,
+            ]
+        )
         mock_tracked.return_value.__aexit__ = AsyncMock(return_value=None)
 
         registry = ModelRegistry()
         registry._initialized = True
         registry._circuit_breakers["supervisor_llm:primary"] = CircuitBreaker()
         registry._circuit_breakers["supervisor_llm:fallback"] = CircuitBreaker()
-        registry._metrics["supervisor_llm:primary"] = ModelMetrics(model_id="primary-model", role="supervisor_llm")
-        registry._metrics["supervisor_llm:fallback"] = ModelMetrics(model_id="fallback-model", role="supervisor_llm")
+        registry._metrics["supervisor_llm:primary"] = ModelMetrics(
+            model_id="primary-model", role="supervisor_llm"
+        )
+        registry._metrics["supervisor_llm:fallback"] = ModelMetrics(
+            model_id="fallback-model", role="supervisor_llm"
+        )
 
         async def test_func(model):
             return {"answer": "test answer"}
 
-        result = await registry.call_with_retry_and_fallback("supervisor_llm", "chat", test_func, max_retries=1, base_delay=0.01)
+        result = await registry.call_with_retry_and_fallback(
+            "supervisor_llm", "chat", test_func, max_retries=1, base_delay=0.01
+        )
         assert result == {"answer": "test answer", "llm_fallback_used": True}
         assert mock_tracked.call_count == 3  # 2 primary + 1 fallback
-

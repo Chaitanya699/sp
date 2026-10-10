@@ -308,9 +308,7 @@ class TestEmbedder:
         """Mock NVIDIAEmbeddings."""
         with patch("nim_sentinel.rag.ingestion.embedder.NVIDIAEmbeddings") as mock_class:
             mock_instance = AsyncMock()
-            mock_instance.aembed_documents = AsyncMock(
-                return_value=[[0.1] * 1024, [0.2] * 1024]
-            )
+            mock_instance.aembed_documents = AsyncMock(return_value=[[0.1] * 1024, [0.2] * 1024])
             mock_instance.model = "nvidia/nv-embedqa-e5-v5"
             mock_class.return_value = mock_instance
             yield mock_instance
@@ -404,6 +402,7 @@ class TestEmbedder:
             mock_settings.return_value.embedding_max_concurrent = 4
 
             import nim_sentinel.rag.ingestion.embedder as embedder_module
+
             embedder_module._embedding_client = None
 
             client1 = await get_embedding_client()
@@ -488,9 +487,7 @@ class TestIngestionPipeline:
 
         try:
             # Mock existing document
-            mock_document_repo.get_by_content_hash = AsyncMock(
-                return_value={"_id": "existing_doc"}
-            )
+            mock_document_repo.get_by_content_hash = AsyncMock(return_value={"_id": "existing_doc"})
 
             pipeline = IngestionPipeline(
                 tenant_id="tenant_123",
@@ -560,7 +557,9 @@ class TestIngestionPipeline:
             temp_path.unlink()
 
     @pytest.mark.asyncio
-    async def test_ingest_directory(self, mock_document_repo, mock_chunk_repo, mock_embedding_client):
+    async def test_ingest_directory(
+        self, mock_document_repo, mock_chunk_repo, mock_embedding_client
+    ):
         """Test directory ingestion."""
         with tempfile.TemporaryDirectory() as tmpdir:
             dir_path = Path(tmpdir)
@@ -591,14 +590,18 @@ class TestIngestionPipeline:
         assert pipeline.tenant_id == "tenant_123"
 
     @pytest.mark.asyncio
-    async def test_ingest_file_convenience(self, mock_document_repo, mock_chunk_repo, mock_embedding_client):
+    async def test_ingest_file_convenience(
+        self, mock_document_repo, mock_chunk_repo, mock_embedding_client
+    ):
         """Test ingest_file convenience function."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Test content")
             temp_path = Path(f.name)
 
         try:
-            with patch("nim_sentinel.rag.ingestion.pipeline.create_ingestion_pipeline") as mock_create:
+            with patch(
+                "nim_sentinel.rag.ingestion.pipeline.create_ingestion_pipeline"
+            ) as mock_create:
                 mock_pipeline = AsyncMock()
                 mock_pipeline.ingest_file = AsyncMock(
                     return_value=IngestionResult(
@@ -619,13 +622,17 @@ class TestIngestionPipeline:
             temp_path.unlink()
 
     @pytest.mark.asyncio
-    async def test_ingest_directory_convenience(self, mock_document_repo, mock_chunk_repo, mock_embedding_client):
+    async def test_ingest_directory_convenience(
+        self, mock_document_repo, mock_chunk_repo, mock_embedding_client
+    ):
         """Test ingest_directory convenience function."""
         with tempfile.TemporaryDirectory() as tmpdir:
             dir_path = Path(tmpdir)
             (dir_path / "doc1.txt").write_text("Content 1")
 
-            with patch("nim_sentinel.rag.ingestion.pipeline.create_ingestion_pipeline") as mock_create:
+            with patch(
+                "nim_sentinel.rag.ingestion.pipeline.create_ingestion_pipeline"
+            ) as mock_create:
                 mock_pipeline = AsyncMock()
                 mock_pipeline.ingest_directory = AsyncMock(
                     return_value=[

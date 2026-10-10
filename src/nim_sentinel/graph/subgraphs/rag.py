@@ -5,16 +5,15 @@ Handles retrieval and generation for RAG queries.
 """
 
 import logging
-from typing import Any
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
-from nim_sentinel.core.config import get_model_config, get_settings
 from nim_sentinel.db.client import get_database
 from nim_sentinel.db.repositories import get_chunk_repository
-from nim_sentinel.rag.ingestion.embedder import get_embedding_client
-from nim_sentinel.rag.retriever import HybridRetriever, get_hybrid_retriever
 from nim_sentinel.graph.state import AgentState
-from nim_sentinel.observability.decorators import traced_rag_node, traced_retriever, traced_embedder
+from nim_sentinel.observability.decorators import traced_rag_node, traced_retriever
+from nim_sentinel.rag.ingestion.embedder import get_embedding_client
+from nim_sentinel.rag.retriever import get_hybrid_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -72,15 +71,10 @@ async def generate_node(state: AgentState) -> AgentState:
         registry = get_model_registry()
 
         async def _generate(model: ChatNVIDIA) -> str:
-            settings = get_settings()
-            generator_config = get_model_config("generator_llm")
-
             # Build context from retrieval results
             context_parts = []
             for i, result in enumerate(state.retrieval_results):
-                context_parts.append(
-                    f"[Source {i+1}] {result.content}"
-                )
+                context_parts.append(f"[Source {i+1}] {result.content}")
             context = "\n\n".join(context_parts)
 
             # Build prompt
@@ -134,7 +128,11 @@ Answer:"""
 
         state.needs_critique = True
 
-        logger.info("RAG Subgraph: Generated answer (confidence: %.2f, fallback: %s)", state.confidence, fallback_used)
+        logger.info(
+            "RAG Subgraph: Generated answer (confidence: %.2f, fallback: %s)",
+            state.confidence,
+            fallback_used,
+        )
 
     except Exception as e:
         logger.error("RAG Subgraph: Generation failed: %s", e)

@@ -2,14 +2,14 @@
 Tests for Data Analyst Agent
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from nim_sentinel.agents.data_analyst import (
-    DataAnalystAgent,
-    AnalystQuery,
-    AnalystResult,
     ALLOWED_STAGES,
     FORBIDDEN_STAGES,
+    AnalystResult,
+    DataAnalystAgent,
     get_data_analyst,
     reset_data_analyst,
 )
@@ -72,7 +72,16 @@ class TestDataAnalystAgent:
 
     def test_validate_pipeline_lookup_valid(self, agent):
         """Test validation accepts valid $lookup."""
-        pipeline = [{"$lookup": {"from": "other_collection", "localField": "id", "foreignField": "ref", "as": "joined"}}]
+        pipeline = [
+            {
+                "$lookup": {
+                    "from": "other_collection",
+                    "localField": "id",
+                    "foreignField": "ref",
+                    "as": "joined",
+                }
+            }
+        ]
         is_valid, error = agent.validate_pipeline(pipeline)
         assert is_valid
 
@@ -161,11 +170,13 @@ class TestDataAnalystAgent:
         mock_coll = AsyncMock()
         mock_cursor = AsyncMock()
 
-        mock_client.__getitem__.return_value = mock_db
+        # Mock the MongoClient wrapper's database property
+        mock_client.database = mock_db
         mock_db.__getitem__.return_value = mock_coll
-        mock_coll.aggregate.return_value = mock_cursor
+        # aggregate returns a coroutine that yields the cursor
+        mock_coll.aggregate = AsyncMock(return_value=mock_cursor)
 
-        # Mock async iteration
+        # Mock async iteration - __aiter__ is called with self
         async def mock_aiter(self):
             yield {"_id": "1", "name": "test", "tenant_id": "tenant_123"}
             yield {"_id": "2", "name": "test2", "tenant_id": "tenant_123"}
@@ -173,7 +184,7 @@ class TestDataAnalystAgent:
         mock_cursor.__aiter__ = mock_aiter
 
         with patch("nim_sentinel.agents.data_analyst.get_mongo_client", return_value=mock_client):
-            with patch("nim_sentinel.agents.data_analyst.get_settings") as mock_settings:
+            with patch("nim_sentinel.core.config.get_settings") as mock_settings:
                 mock_settings.return_value.mongodb_database = "test_db"
 
                 result = await agent.execute_simple(
@@ -197,9 +208,11 @@ class TestDataAnalystAgent:
         mock_coll = AsyncMock()
         mock_cursor = AsyncMock()
 
-        mock_client.__getitem__.return_value = mock_db
+        # Mock the MongoClient wrapper's database property
+        mock_client.database = mock_db
         mock_db.__getitem__.return_value = mock_coll
-        mock_coll.aggregate.return_value = mock_cursor
+        # aggregate returns a coroutine that yields the cursor
+        mock_coll.aggregate = AsyncMock(return_value=mock_cursor)
 
         async def mock_aiter(self):
             for i in range(5):
@@ -208,7 +221,7 @@ class TestDataAnalystAgent:
         mock_cursor.__aiter__ = mock_aiter
 
         with patch("nim_sentinel.agents.data_analyst.get_mongo_client", return_value=mock_client):
-            with patch("nim_sentinel.agents.data_analyst.get_settings") as mock_settings:
+            with patch("nim_sentinel.core.config.get_settings") as mock_settings:
                 mock_settings.return_value.mongodb_database = "test_db"
 
                 result = await agent.execute(

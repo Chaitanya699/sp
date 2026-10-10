@@ -144,7 +144,7 @@ class IngestionPipeline:
 
             # Clean text
             clean_content = clean_text(text_content, self.config.clean_options)
-            clean_metadata = extract_metadata_from_text(clean_content)
+            _ = extract_metadata_from_text(clean_content)
 
             # Update document status to processing
             doc_repo = await self._get_document_repo()
@@ -161,9 +161,7 @@ class IngestionPipeline:
             )
 
             if not chunks:
-                await doc_repo.update_status(
-                    document_id, "failed", error="No chunks generated"
-                )
+                await doc_repo.update_status(document_id, "failed", error="No chunks generated")
                 return IngestionResult(
                     document_id=document_id,
                     filename=filename,
@@ -340,9 +338,7 @@ class IngestionPipeline:
             )
 
             if not chunks:
-                await doc_repo.update_status(
-                    doc_id, "failed", error="No chunks generated"
-                )
+                await doc_repo.update_status(doc_id, "failed", error="No chunks generated")
                 return IngestionResult(
                     document_id=doc_id,
                     filename=filename,
@@ -471,7 +467,7 @@ class IngestionPipeline:
         # Find files
         pattern = "**/*" if recursive else "*"
         files: list[Path] = []
-        for ext in (extensions or ["pdf", "txt", "md", "markdown"]):
+        for ext in extensions or ["pdf", "txt", "md", "markdown"]:
             files.extend(directory.glob(f"{pattern}.{ext}"))
 
         # Also check for files without extension that might be text
@@ -495,7 +491,9 @@ class IngestionPipeline:
                 return await self.ingest_file(file_path)
 
         tasks = [ingest_with_semaphore(f) for f in files]
-        results: list[IngestionResult | BaseException] = await asyncio.gather(*tasks, return_exceptions=True)
+        results: list[IngestionResult | BaseException] = await asyncio.gather(
+            *tasks, return_exceptions=True
+        )
 
         # Handle exceptions
         final_results: list[IngestionResult] = []

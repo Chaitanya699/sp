@@ -24,6 +24,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class TokenData(BaseModel):
     """Decoded JWT token data."""
+
     sub: str  # user_id
     username: str
     roles: list[str]
@@ -35,6 +36,7 @@ class TokenData(BaseModel):
 
 class User(BaseModel):
     """User model."""
+
     id: str
     username: str
     email: str
@@ -48,6 +50,7 @@ class User(BaseModel):
 
 class RolePermissions(BaseModel):
     """Role-based permissions."""
+
     role: str
     permissions: set[str]
     description: str = ""

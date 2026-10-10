@@ -7,7 +7,8 @@ FastAPI endpoints for document ingestion and RAG queries with JWT authentication
 import json
 import logging
 import time
-from typing import Any, Awaitable, Callable, AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -31,11 +32,11 @@ from nim_sentinel.db.repositories import (
     get_chunk_repository,
     get_document_repository,
 )
+from nim_sentinel.graph.checkpointer import create_checkpointer
+from nim_sentinel.graph.main_graph import get_graph_for_tenant, run_graph
+from nim_sentinel.llm.model_registry import FallbackExhaustedError
 from nim_sentinel.rag.ingestion.pipeline import IngestionConfig, IngestionPipeline
 from nim_sentinel.rag.retriever import get_hybrid_retriever
-from nim_sentinel.graph.main_graph import run_graph, get_graph_for_tenant
-from nim_sentinel.graph.checkpointer import create_checkpointer
-from nim_sentinel.llm.model_registry import FallbackExhaustedError, get_model_registry
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,7 @@ async def get_current_user(
 
 def require_permission(permission: str) -> Callable[[], Awaitable[TokenData]]:
     """Dependency factory to check if user has required permission."""
+
     async def _check_permission(
         credentials: HTTPAuthorizationCredentials | None = Depends(security),
     ) -> TokenData:
@@ -126,6 +128,7 @@ def require_permission(permission: str) -> Callable[[], Awaitable[TokenData]]:
                 detail=f"Permission denied: requires '{permission}'",
             )
         return user
+
     return _check_permission
 
 
@@ -234,6 +237,7 @@ async def upload_document(
 
         # Get embedding model from model registry
         from nim_sentinel.core.config import get_model_config
+
         embedding_config = get_model_config("embedding")
 
         # Run ingestion pipeline
@@ -334,7 +338,11 @@ async def list_documents(
 
 @router.get(
     "/documents/{document_id}",
-    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+    },
 )
 async def get_document(
     document_id: str,
@@ -361,7 +369,11 @@ async def get_document(
 @router.delete(
     "/documents/{document_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+    },
 )
 async def delete_document(
     document_id: str,
@@ -389,7 +401,11 @@ async def delete_document(
 @router.post(
     "/query",
     response_model=QueryResponse,
-    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+    },
 )
 async def query_documents(
     request: QueryRequest,
@@ -401,7 +417,6 @@ async def query_documents(
 
     Returns top-k relevant chunks with optional citations.
     """
-    import time
 
     start_time = time.perf_counter()
     correlation_id = generate_correlation_id()
@@ -489,7 +504,9 @@ class AgentQueryRequest(BaseModel):
     """Request model for /v1/agent/query endpoint (LangGraph-based)."""
 
     query: str = Field(..., min_length=1, max_length=10000, description="Query text")
-    session_id: str = Field(..., min_length=1, max_length=100, description="Session ID for conversation continuity")
+    session_id: str = Field(
+        ..., min_length=1, max_length=100, description="Session ID for conversation continuity"
+    )
     top_k: int = Field(default=10, ge=1, le=50, description="Number of results to return")
     filter: dict[str, Any] | None = Field(default=None, description="Optional metadata filters")
     include_citations: bool = Field(default=True, description="Include citations in response")
@@ -513,7 +530,11 @@ class AgentQueryResponse(BaseModel):
 @router.post(
     "/agent/query",
     response_model=AgentQueryResponse,
-    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+    },
 )
 async def agent_query(
     request: AgentQueryRequest,
@@ -529,7 +550,6 @@ async def agent_query(
     - Critic for answer quality review
     - MongoDB checkpointer for conversation persistence
     """
-    import time
 
     start_time = time.perf_counter()
     correlation_id = generate_correlation_id()
@@ -626,7 +646,9 @@ class ChatRequest(BaseModel):
     """Request model for /v1/chat endpoint."""
 
     query: str = Field(..., min_length=1, max_length=10000, description="Query text")
-    session_id: str = Field(..., min_length=1, max_length=100, description="Session ID for conversation continuity")
+    session_id: str = Field(
+        ..., min_length=1, max_length=100, description="Session ID for conversation continuity"
+    )
     top_k: int = Field(default=10, ge=1, le=50, description="Number of results to return")
     filter: dict[str, Any] | None = Field(default=None, description="Optional metadata filters")
     include_citations: bool = Field(default=True, description="Include citations in response")
@@ -650,7 +672,11 @@ class ChatResponse(BaseModel):
 @router.post(
     "/chat",
     response_model=ChatResponse,
-    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+    },
 )
 async def chat(
     request: ChatRequest,
@@ -666,7 +692,6 @@ async def chat(
     - Critic for answer quality review
     - MongoDB checkpointer for conversation persistence
     """
-    import time
 
     start_time = time.perf_counter()
     correlation_id = generate_correlation_id()
@@ -762,7 +787,11 @@ async def chat(
 
 @router.post(
     "/chat/stream",
-    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+    },
 )
 async def chat_stream(
     request: ChatRequest,
@@ -780,8 +809,6 @@ async def chat_stream(
     - event: "end" - Final event with complete answer
     - event: "error" - Error event
     """
-    import json
-    import time
 
     correlation_id = generate_correlation_id()
 
@@ -804,12 +831,12 @@ async def chat_stream(
             # Send start event
             yield f"event: start\ndata: {json.dumps({'session_id': request.session_id, 'query': query})}\n\n"
 
-            # Create graph with checkpointer
-            checkpointer = create_checkpointer(tenant_id)
+            # Create graph
             graph = get_graph_for_tenant(tenant_id)
 
             # Config for checkpointer
             from langchain_core.runnables import RunnableConfig
+
             config: RunnableConfig = {
                 "configurable": {
                     "thread_id": request.session_id,
@@ -819,6 +846,7 @@ async def chat_stream(
 
             # Create initial state
             from nim_sentinel.graph.state import create_initial_state
+
             initial_state = create_initial_state(
                 query=query,
                 tenant_id=tenant_id,
@@ -839,10 +867,18 @@ async def chat_stream(
                             retrieval_data = [
                                 {
                                     "rank": i + 1,
-                                    "content": r.content if hasattr(r, 'content') else r.get("content", ""),
-                                    "document_id": r.document_id if hasattr(r, 'document_id') else r.get("document_id", ""),
-                                    "chunk_index": r.chunk_index if hasattr(r, 'chunk_index') else r.get("chunk_index", 0),
-                                    "score": r.score if hasattr(r, 'score') else r.get("score", 0.0),
+                                    "content": r.content
+                                    if hasattr(r, "content")
+                                    else r.get("content", ""),
+                                    "document_id": r.document_id
+                                    if hasattr(r, "document_id")
+                                    else r.get("document_id", ""),
+                                    "chunk_index": r.chunk_index
+                                    if hasattr(r, "chunk_index")
+                                    else r.get("chunk_index", 0),
+                                    "score": r.score
+                                    if hasattr(r, "score")
+                                    else r.get("score", 0.0),
                                 }
                                 for i, r in enumerate(results)
                             ]
@@ -858,6 +894,7 @@ async def chat_stream(
             final_state = await graph.ainvoke(initial_state, config=config)
             if isinstance(final_state, dict):
                 from nim_sentinel.graph.state import AgentState
+
                 final_state = AgentState(**final_state)
 
             # Send end event with complete answer
@@ -880,7 +917,9 @@ async def chat_stream(
             yield f"event: end\ndata: {json.dumps({'answer': final_state.answer, 'confidence': final_state.confidence, 'citations': citations, 'retrieval_results': retrieval_results, 'total_results': len(final_state.retrieval_results)})}\n\n"
 
         except Exception as e:
-            logger.error("Chat stream failed", extra={"correlation_id": correlation_id, "error": str(e)})
+            logger.error(
+                "Chat stream failed", extra={"correlation_id": correlation_id, "error": str(e)}
+            )
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(

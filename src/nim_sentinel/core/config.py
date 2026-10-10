@@ -16,6 +16,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class ModelConfig(BaseSettings):
     """Configuration for a single model role."""
+
     primary: str
     fallback: str = ""
     primary_unverified: bool = False
@@ -31,6 +32,7 @@ class ModelConfig(BaseSettings):
 
 class ModelRegistryConfig(BaseSettings):
     """Complete model registry configuration."""
+
     model_registry: dict[str, ModelConfig] = Field(default_factory=dict)
     model_metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -39,6 +41,7 @@ class ModelRegistryConfig(BaseSettings):
 
 class GuardrailsConfig(BaseSettings):
     """Guardrails configuration."""
+
     input_guards: dict[str, Any] = Field(default_factory=dict)
     output_guards: dict[str, Any] = Field(default_factory=dict)
     tool_safety: dict[str, Any] = Field(default_factory=dict)
@@ -49,6 +52,7 @@ class GuardrailsConfig(BaseSettings):
 
 class AgentsConfig(BaseSettings):
     """Agent configuration."""
+
     supervisor: dict[str, Any] = Field(default_factory=dict)
     rag_agent: dict[str, Any] = Field(default_factory=dict)
     data_analyst: dict[str, Any] = Field(default_factory=dict)
@@ -65,6 +69,7 @@ class AgentsConfig(BaseSettings):
 
 class EvalThresholdsConfig(BaseSettings):
     """Evaluation thresholds configuration."""
+
     components: dict[str, Any] = Field(default_factory=dict)
     end_to_end: dict[str, Any] = Field(default_factory=dict)
     regression: dict[str, Any] = Field(default_factory=dict)
@@ -91,17 +96,25 @@ class Settings(BaseSettings):
     langsmith_api_key: str = Field(default="", description="LangSmith API Key")
     langsmith_tracing: bool = Field(default=True, description="Enable LangSmith tracing")
     langsmith_project: str = Field(default="nim-sentinel-dev", description="LangSmith project name")
-    langsmith_endpoint: str = Field(default="https://api.smith.langchain.com", description="LangSmith endpoint")
+    langsmith_endpoint: str = Field(
+        default="https://api.smith.langchain.com", description="LangSmith endpoint"
+    )
 
     # MongoDB
     mongo_target: str = Field(default="atlas", description="MongoDB target: 'local' or 'atlas'")
-    mongodb_uri: str = Field(default="mongodb://localhost:27017", description="MongoDB Atlas connection URI")
-    mongodb_local_uri: str = Field(default="mongodb://localhost:27017", description="MongoDB local connection URI")
+    mongodb_uri: str = Field(
+        default="mongodb://localhost:27017", description="MongoDB Atlas connection URI"
+    )
+    mongodb_local_uri: str = Field(
+        default="mongodb://localhost:27017", description="MongoDB local connection URI"
+    )
     mongodb_database: str = Field(default="nim_sentinel", description="MongoDB database name")
     mongodb_max_pool_size: int = Field(default=100, description="MongoDB max pool size")
     mongodb_min_pool_size: int = Field(default=10, description="MongoDB min pool size")
     mongodb_max_idle_time_ms: int = Field(default=30000, description="MongoDB max idle time ms")
-    mongodb_server_selection_timeout_ms: int = Field(default=5000, description="MongoDB server selection timeout ms")
+    mongodb_server_selection_timeout_ms: int = Field(
+        default=5000, description="MongoDB server selection timeout ms"
+    )
     mongodb_connect_timeout_ms: int = Field(default=10000, description="MongoDB connect timeout ms")
     mongodb_socket_timeout_ms: int = Field(default=20000, description="MongoDB socket timeout ms")
 
@@ -132,11 +145,15 @@ class Settings(BaseSettings):
 
     # Guardrails
     guardrails_enabled: bool = Field(default=True, description="Enable guardrails")
-    guardrails_config_path: str = Field(default="configs/guardrails.yaml", description="Guardrails config path")
+    guardrails_config_path: str = Field(
+        default="configs/guardrails.yaml", description="Guardrails config path"
+    )
 
     # Evaluation
     eval_enabled: bool = Field(default=True, description="Enable evaluation")
-    eval_thresholds_path: str = Field(default="configs/eval_thresholds.yaml", description="Eval thresholds config path")
+    eval_thresholds_path: str = Field(
+        default="configs/eval_thresholds.yaml", description="Eval thresholds config path"
+    )
 
     # Feature Flags
     feature_vision: bool = Field(default=True, description="Enable vision agent")
@@ -145,11 +162,15 @@ class Settings(BaseSettings):
     feature_action_agent: bool = Field(default=True, description="Enable action agent")
 
     # RAG/Ingestion
-    embedding_model: str = Field(default="", description="Embedding model (empty = use model registry)")
+    embedding_model: str = Field(
+        default="", description="Embedding model (empty = use model registry)"
+    )
     chunk_size: int = Field(default=512, description="Chunk size in tokens")
     chunk_overlap: int = Field(default=50, description="Chunk overlap in tokens")
     embedding_batch_size: int = Field(default=32, description="Embedding batch size")
-    embedding_max_concurrent: int = Field(default=4, description="Max concurrent embedding requests")
+    embedding_max_concurrent: int = Field(
+        default=4, description="Max concurrent embedding requests"
+    )
 
     # Computed paths
     config_dir: Path = Field(default=Path("configs"), description="Config directory")
@@ -217,7 +238,9 @@ def get_model_config(role: str) -> ModelConfig:
     """Get model configuration for a specific role."""
     registry = get_model_registry()
     if role not in registry.model_registry:
-        raise ValueError(f"Unknown model role: {role}. Available: {list(registry.model_registry.keys())}")
+        raise ValueError(
+            f"Unknown model role: {role}. Available: {list(registry.model_registry.keys())}"
+        )
     return registry.model_registry[role]
 
 

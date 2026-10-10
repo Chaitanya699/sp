@@ -2,13 +2,13 @@
 Tests for Guardrails - NemoGuard module
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from nim_sentinel.guardrails.nemoguard import (
+    NemoGuardAction,
     NemoGuardClient,
     NemoGuardResult,
-    NemoGuardModel,
-    NemoGuardAction,
     get_nemo_guard_client,
     reset_nemo_guard_client,
 )

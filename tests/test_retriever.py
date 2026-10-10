@@ -2,7 +2,7 @@
 Tests for NIM Sentinel Hybrid Retriever
 """
 
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from langchain_core.documents import Document
@@ -179,23 +179,73 @@ class TestHybridRetriever:
     async def test_rrf_fusion_scoring(self, retriever):
         """Test RRF fusion scoring logic."""
         vector_results = [
-            {"document_id": "doc1", "chunk_index": 0, "content": "A", "metadata": {}, "embedding_model": "test", "score": 0.9},
-            {"document_id": "doc2", "chunk_index": 0, "content": "B", "metadata": {}, "embedding_model": "test", "score": 0.8},
-            {"document_id": "doc3", "chunk_index": 0, "content": "C", "metadata": {}, "embedding_model": "test", "score": 0.7},
+            {
+                "document_id": "doc1",
+                "chunk_index": 0,
+                "content": "A",
+                "metadata": {},
+                "embedding_model": "test",
+                "score": 0.9,
+            },
+            {
+                "document_id": "doc2",
+                "chunk_index": 0,
+                "content": "B",
+                "metadata": {},
+                "embedding_model": "test",
+                "score": 0.8,
+            },
+            {
+                "document_id": "doc3",
+                "chunk_index": 0,
+                "content": "C",
+                "metadata": {},
+                "embedding_model": "test",
+                "score": 0.7,
+            },
         ]
         text_results = [
-            {"document_id": "doc2", "chunk_index": 0, "content": "B", "metadata": {}, "embedding_model": "test", "score": 0.85},
-            {"document_id": "doc1", "chunk_index": 0, "content": "A", "metadata": {}, "embedding_model": "test", "score": 0.75},
-            {"document_id": "doc4", "chunk_index": 0, "content": "D", "metadata": {}, "embedding_model": "test", "score": 0.65},
+            {
+                "document_id": "doc2",
+                "chunk_index": 0,
+                "content": "B",
+                "metadata": {},
+                "embedding_model": "test",
+                "score": 0.85,
+            },
+            {
+                "document_id": "doc1",
+                "chunk_index": 0,
+                "content": "A",
+                "metadata": {},
+                "embedding_model": "test",
+                "score": 0.75,
+            },
+            {
+                "document_id": "doc4",
+                "chunk_index": 0,
+                "content": "D",
+                "metadata": {},
+                "embedding_model": "test",
+                "score": 0.65,
+            },
         ]
 
         fused = retriever._rrf_fusion(vector_results, text_results)
 
         # doc1 and doc2 appear in both, should have higher RRF scores
-        doc1_score = next(f["rrf_score"] for f in fused if f["document_id"] == "doc1" and f["chunk_index"] == 0)
-        doc2_score = next(f["rrf_score"] for f in fused if f["document_id"] == "doc2" and f["chunk_index"] == 0)
-        doc3_score = next(f["rrf_score"] for f in fused if f["document_id"] == "doc3" and f["chunk_index"] == 0)
-        doc4_score = next(f["rrf_score"] for f in fused if f["document_id"] == "doc4" and f["chunk_index"] == 0)
+        doc1_score = next(
+            f["rrf_score"] for f in fused if f["document_id"] == "doc1" and f["chunk_index"] == 0
+        )
+        doc2_score = next(
+            f["rrf_score"] for f in fused if f["document_id"] == "doc2" and f["chunk_index"] == 0
+        )
+        doc3_score = next(
+            f["rrf_score"] for f in fused if f["document_id"] == "doc3" and f["chunk_index"] == 0
+        )
+        doc4_score = next(
+            f["rrf_score"] for f in fused if f["document_id"] == "doc4" and f["chunk_index"] == 0
+        )
 
         # Both in vector and text -> higher score
         assert doc1_score > doc3_score

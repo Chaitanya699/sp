@@ -12,6 +12,7 @@ from typing import Any
 @dataclass
 class GroundednessResult:
     """Result of groundedness check."""
+
     grounded: bool
     score: float
     reason: str
@@ -52,8 +53,9 @@ def check_groundedness(
     # Check if answer contains specific claims that should be cited
     has_numbers = bool(re.search(r"\b\d+(?:\.\d+)?\b", answer))
     # Entities: capitalized words not at start of string, or multi-word proper nouns
-    has_entities = bool(re.search(r"(?<!\A\s)\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b", answer)) or \
-                   bool(re.search(r"(?<=\s)\b[A-Z][a-z]{2,}\b(?!\s+[a-z])", answer))
+    has_entities = bool(re.search(r"(?<!\A\s)\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b", answer)) or bool(
+        re.search(r"(?<=\s)\b[A-Z][a-z]{2,}\b(?!\s+[a-z])", answer)
+    )
     has_specific_claims = has_numbers or has_entities
 
     # Verify citations have content
@@ -120,7 +122,9 @@ def check_citation_coverage(
     if key_terms is None:
         # Extract potential key terms (proper nouns - multi-word capitalized, numbers)
         # Exclude first word of sentence
-        key_terms = re.findall(r"(?<=\s)\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b|\b\d+(?:\.\d+)?\b", answer)
+        key_terms = re.findall(
+            r"(?<=\s)\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b|\b\d+(?:\.\d+)?\b", answer
+        )
 
     citation_text = " ".join(c.get("content", "") for c in citations)
 

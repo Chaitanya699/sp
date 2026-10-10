@@ -2,13 +2,13 @@
 Tests for NIM Sentinel Graph Checkpointer Module (B5)
 """
 
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, UTC
+from nim_sentinel.graph.checkpointer import MongoDBCheckpointer
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.asynchronous.database import AsyncDatabase
-from nim_sentinel.graph.checkpointer import MongoDBCheckpointer
-from langgraph.checkpoint.base import CheckpointTuple
 
 
 class TestMongoDBCheckpointer:
