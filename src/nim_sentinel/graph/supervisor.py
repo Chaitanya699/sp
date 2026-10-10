@@ -12,6 +12,7 @@ from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from nim_sentinel.core.config import get_model_config, get_settings
 from nim_sentinel.graph.state import AgentState, SupervisorDecision, create_initial_state
 from nim_sentinel.llm.model_registry import get_model_registry
+from nim_sentinel.observability.decorators import traced_supervisor_node
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +149,7 @@ Respond with a JSON object:
             return await self.decide(state)
 
 
+@traced_supervisor_node
 async def supervisor_node(state: AgentState) -> AgentState:
     """LangGraph node function for supervisor."""
     supervisor = Supervisor()

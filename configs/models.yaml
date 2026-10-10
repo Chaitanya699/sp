@@ -99,30 +99,31 @@ model_registry:
     note: "Requires separate Riva NIM deployment (gRPC), not available via ChatNVIDIA API"
 
   safety_content:
-    primary: "nvidia/llama-3.1-nemoguard-8b-content-safety"
+    primary: "ibm/granite-guardian-3.0-8b"
+    fallback: "meta/llama-guard-4-12b"
+    temperature: 0.1
+    max_tokens: 4096
+    timeout_seconds: 30
+    max_retries: 3
+    note: "nvidia/llama-3.1-nemoguard-8b-content-safety timed out"
+
+  safety_topic:
+    primary: "meta/llama-guard-4-12b"
     fallback: "ibm/granite-guardian-3.0-8b"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
     max_retries: 3
-
-  safety_topic:
-    primary: "nvidia/llama-3.1-nemoguard-8b-topic-control"
-    fallback: "meta/llama-guard-4-12b"
-    temperature: 0.1
-    max_tokens: 4096
-    timeout_seconds: 30
-    max_retries: 3
+    note: "nvidia/llama-3.1-nemoguard-8b-topic-control CUDA error"
 
   safety_jailbreak:
-    primary: "nvidia/llama-3.1-nemoguard-8b-jailbreak-detect"
-    primary_unverified: true
-    fallback: "meta/llama-guard-4-12b"
+    primary: "meta/llama-guard-4-12b"
+    fallback: "ibm/granite-guardian-3.0-8b"
     temperature: 0.1
     max_tokens: 4096
     timeout_seconds: 30
     max_retries: 3
-    note: "Jailbreak detect model not explicitly listed; using llama-guard as fallback"
+    note: "nvidia/llama-3.1-nemoguard-8b-jailbreak-detect unknown error"
 
   judge_llm:
     primary: "nvidia/nemotron-3-super-120b-a12b"

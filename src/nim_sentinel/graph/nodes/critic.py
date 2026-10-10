@@ -11,6 +11,7 @@ from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from nim_sentinel.core.config import get_model_config, get_settings
 from nim_sentinel.graph.state import AgentState, CriticOutput
 from nim_sentinel.llm.model_registry import get_model_registry
+from nim_sentinel.observability.decorators import traced_critic_node
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,7 @@ Review this answer and provide your evaluation."""
             )
 
 
+@traced_critic_node
 async def critic_node(state: AgentState) -> AgentState:
     """LangGraph node function for critic."""
     logger.info("Critic: Reviewing answer (retry %d)", state.retry_count)

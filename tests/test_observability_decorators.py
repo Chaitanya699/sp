@@ -1,10 +1,10 @@
 """
-Tests for Observability module
+Tests for Observability - Decorators module
 """
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from nim_sentinel.observability import (
+from nim_sentinel.observability.decorators import (
     traced_node,
     traced_tool,
     traced_llm_call,
@@ -17,89 +17,7 @@ from nim_sentinel.observability import (
     traced_vector_search,
     traced_text_search,
     traced_hybrid_retrieve,
-    _redact_pii,
-    _redact_dict,
 )
-
-
-class TestRedactPII:
-    """Tests for PII redaction functions."""
-
-    def test_redact_pii_email(self):
-        """Test email redaction."""
-        text = "Contact me at test@example.com"
-        result = _redact_pii(text)
-        assert "[REDACTED_EMAIL]" in result
-        assert "test@example.com" not in result
-
-    def test_redact_pii_phone(self):
-        """Test phone redaction."""
-        text = "Call me at 555-123-4567"
-        result = _redact_pii(text)
-        assert "[REDACTED_PHONE]" in result
-
-    def test_redact_pii_ssn(self):
-        """Test SSN redaction."""
-        text = "SSN: 123-45-6789"
-        result = _redact_pii(text)
-        assert "[REDACTED_SSN]" in result
-
-    def test_redact_pii_credit_card(self):
-        """Test credit card redaction."""
-        text = "Card: 1234-5678-9012-3456"
-        result = _redact_pii(text)
-        assert "[REDACTED_CREDIT_CARD]" in result
-
-    def test_redact_pii_multiple(self):
-        """Test multiple PII types."""
-        text = "Email: test@example.com, Phone: 555-123-4567"
-        result = _redact_pii(text)
-        assert "[REDACTED_EMAIL]" in result
-        assert "[REDACTED_PHONE]" in result
-
-    def test_redact_pii_none(self):
-        """Test no PII."""
-        text = "Hello world"
-        result = _redact_pii(text)
-        assert result == "Hello world"
-
-    def test_redact_pii_empty(self):
-        """Test empty string."""
-        result = _redact_pii("")
-        assert result == ""
-
-    def test_redact_pii_none_input(self):
-        """Test None input."""
-        result = _redact_pii(None)
-        assert result is None
-
-    def test_redact_dict_string_values(self):
-        """Test dict redaction with string values."""
-        data = {"email": "test@example.com", "name": "John"}
-        result = _redact_dict(data)
-        assert "[REDACTED_EMAIL]" in result["email"]
-        assert result["name"] == "John"
-
-    def test_redact_dict_nested(self):
-        """Test dict redaction with nested dict."""
-        data = {"user": {"email": "test@example.com", "age": 30}}
-        result = _redact_dict(data)
-        assert "[REDACTED_EMAIL]" in result["user"]["email"]
-        assert result["user"]["age"] == 30
-
-    def test_redact_dict_list(self):
-        """Test dict redaction with list of strings."""
-        data = {"emails": ["test@example.com", "admin@example.com"]}
-        result = _redact_dict(data)
-        assert "[REDACTED_EMAIL]" in result["emails"][0]
-        assert "[REDACTED_EMAIL]" in result["emails"][1]
-
-    def test_redact_dict_list_of_dicts(self):
-        """Test dict redaction with list of dicts."""
-        data = {"users": [{"email": "test@example.com"}, {"email": "admin@example.com"}]}
-        result = _redact_dict(data)
-        assert "[REDACTED_EMAIL]" in result["users"][0]["email"]
-        assert "[REDACTED_EMAIL]" in result["users"][1]["email"]
 
 
 class TestTracedNode:
@@ -108,7 +26,7 @@ class TestTracedNode:
     @pytest.mark.asyncio
     async def test_traced_node_async(self):
         """Test traced_node with async function."""
-        @traced_node("test_node")
+        @traced_node(name="test_node", role="test")
         async def my_node(state: dict) -> dict:
             return {"result": "success"}
 
@@ -117,7 +35,7 @@ class TestTracedNode:
 
     def test_traced_node_sync(self):
         """Test traced_node with sync function."""
-        @traced_node("test_node_sync")
+        @traced_node(name="test_node_sync", role="test")
         def my_node(state: dict) -> dict:
             return {"result": "success"}
 
@@ -127,18 +45,17 @@ class TestTracedNode:
     @pytest.mark.asyncio
     async def test_traced_node_redacts_pii(self):
         """Test traced_node redacts PII in inputs."""
-        @traced_node("test_node", redact=True)
+        @traced_node(name="test_node", redact=True, role="test")
         async def my_node(state: dict) -> dict:
             return state
 
-        # This should not raise and should redact internally
         result = await my_node({"email": "test@example.com"})
         assert result == {"email": "test@example.com"}
 
     @pytest.mark.asyncio
     async def test_traced_node_no_redact(self):
         """Test traced_node without redaction."""
-        @traced_node("test_node", redact=False)
+        @traced_node(name="test_node", redact=False, role="test")
         async def my_node(state: dict) -> dict:
             return state
 
@@ -148,7 +65,7 @@ class TestTracedNode:
     @pytest.mark.asyncio
     async def test_traced_node_exception(self):
         """Test traced_node propagates exceptions."""
-        @traced_node("test_node")
+        @traced_node(name="test_node", role="test")
         async def my_node(state: dict) -> dict:
             raise ValueError("Test error")
 
@@ -162,7 +79,7 @@ class TestTracedTool:
     @pytest.mark.asyncio
     async def test_traced_tool_async(self):
         """Test traced_tool with async function."""
-        @traced_tool("test_tool")
+        @traced_tool(name="test_tool", role="test")
         async def my_tool(query: str) -> str:
             return f"Result for {query}"
 
@@ -171,7 +88,7 @@ class TestTracedTool:
 
     def test_traced_tool_sync(self):
         """Test traced_tool with sync function."""
-        @traced_tool("test_tool_sync")
+        @traced_tool(name="test_tool_sync", role="test")
         def my_tool(query: str) -> str:
             return f"Result for {query}"
 
@@ -181,7 +98,7 @@ class TestTracedTool:
     @pytest.mark.asyncio
     async def test_traced_tool_redacts_kwargs(self):
         """Test traced_tool redacts PII in kwargs."""
-        @traced_tool("test_tool", redact=True)
+        @traced_tool(name="test_tool", redact=True, role="test")
         async def my_tool(query: str, user_email: str) -> str:
             return f"Result for {query}"
 
@@ -191,7 +108,7 @@ class TestTracedTool:
     @pytest.mark.asyncio
     async def test_traced_tool_exception(self):
         """Test traced_tool propagates exceptions."""
-        @traced_tool("test_tool")
+        @traced_tool(name="test_tool", role="test")
         async def my_tool(query: str) -> str:
             raise ValueError("Tool error")
 
@@ -205,7 +122,7 @@ class TestTracedLLMCall:
     @pytest.mark.asyncio
     async def test_traced_llm_call_async(self):
         """Test traced_llm_call with async function."""
-        @traced_llm_call("test_llm", role="supervisor")
+        @traced_llm_call(name="test_llm", role="supervisor", model_id="test-model")
         async def call_llm(prompt: str) -> str:
             return "LLM response"
 
@@ -214,7 +131,7 @@ class TestTracedLLMCall:
 
     def test_traced_llm_call_sync(self):
         """Test traced_llm_call with sync function."""
-        @traced_llm_call("test_llm_sync", role="critic")
+        @traced_llm_call(name="test_llm_sync", role="critic", model_id="test-model")
         def call_llm(prompt: str) -> str:
             return "LLM response"
 
@@ -224,7 +141,7 @@ class TestTracedLLMCall:
     @pytest.mark.asyncio
     async def test_traced_llm_call_redacts_prompt(self):
         """Test traced_llm_call redacts PII in prompt."""
-        @traced_llm_call("test_llm", role="generator", redact=True)
+        @traced_llm_call(name="test_llm", role="generator", model_id="test-model", redact=True)
         async def call_llm(prompt: str) -> str:
             return "Response"
 
@@ -234,7 +151,7 @@ class TestTracedLLMCall:
     @pytest.mark.asyncio
     async def test_traced_llm_call_exception(self):
         """Test traced_llm_call propagates exceptions."""
-        @traced_llm_call("test_llm", role="supervisor")
+        @traced_llm_call(name="test_llm", role="supervisor", model_id="test-model")
         async def call_llm(prompt: str) -> str:
             raise ValueError("LLM error")
 
@@ -248,7 +165,7 @@ class TestTracedRetriever:
     @pytest.mark.asyncio
     async def test_traced_retriever_async(self):
         """Test traced_retriever with async function."""
-        @traced_retriever("test_retriever")
+        @traced_retriever(name="test_retriever", role="retriever")
         async def retrieve(query: str) -> list[str]:
             return ["doc1", "doc2"]
 
@@ -257,7 +174,7 @@ class TestTracedRetriever:
 
     def test_traced_retriever_sync(self):
         """Test traced_retriever with sync function."""
-        @traced_retriever("test_retriever_sync")
+        @traced_retriever(name="test_retriever_sync", role="retriever")
         def retrieve(query: str) -> list[str]:
             return ["doc1", "doc2"]
 
@@ -267,7 +184,7 @@ class TestTracedRetriever:
     @pytest.mark.asyncio
     async def test_traced_retriever_redacts_query(self):
         """Test traced_retriever redacts PII in query."""
-        @traced_retriever("test_retriever", redact=True)
+        @traced_retriever(name="test_retriever", redact=True, role="retriever")
         async def retrieve(query: str) -> list[str]:
             return ["doc1"]
 
@@ -277,7 +194,7 @@ class TestTracedRetriever:
     @pytest.mark.asyncio
     async def test_traced_retriever_exception(self):
         """Test traced_retriever propagates exceptions."""
-        @traced_retriever("test_retriever")
+        @traced_retriever(name="test_retriever", role="retriever")
         async def retrieve(query: str) -> list[str]:
             raise ValueError("Retriever error")
 

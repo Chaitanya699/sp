@@ -14,10 +14,12 @@ from nim_sentinel.db.repositories import get_chunk_repository
 from nim_sentinel.rag.ingestion.embedder import get_embedding_client
 from nim_sentinel.rag.retriever import HybridRetriever, get_hybrid_retriever
 from nim_sentinel.graph.state import AgentState
+from nim_sentinel.observability.decorators import traced_rag_node, traced_retriever, traced_embedder
 
 logger = logging.getLogger(__name__)
 
 
+@traced_retriever
 async def retrieve_node(state: AgentState) -> AgentState:
     """Retrieve relevant documents using hybrid retriever."""
     logger.info("RAG Subgraph: Starting retrieval for query: %s", state.query[:100])
@@ -53,6 +55,7 @@ async def retrieve_node(state: AgentState) -> AgentState:
     return state
 
 
+@traced_rag_node
 async def generate_node(state: AgentState) -> AgentState:
     """Generate answer using retrieved context."""
     logger.info("RAG Subgraph: Generating answer")
@@ -144,6 +147,6 @@ Answer:"""
 
 async def rag_subgraph(state: AgentState) -> AgentState:
     """Run the full RAG pipeline: retrieve -> generate."""
-    state = await retrieve_node(state)
+    state = await retrieve_node(state)  # type: ignore[arg-type, misc]
     state = await generate_node(state)
     return state
